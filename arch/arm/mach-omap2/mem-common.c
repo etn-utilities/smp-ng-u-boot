@@ -161,6 +161,8 @@ u32 mem_ok(u32 cs)
 void enable_gpmc_cs_config(const u32 *gpmc_config, const struct gpmc_cs *cs,
 				u32 base, u32 size)
 {
+	u32 config7_value = 0;
+
 	writel(0, &cs->config7);
 	sdelay(1000);
 	/* Delay for settling */
@@ -172,7 +174,7 @@ void enable_gpmc_cs_config(const u32 *gpmc_config, const struct gpmc_cs *cs,
 	writel(gpmc_config[5], &cs->config6);
 	/* Enable the config */
 	config7_value = (((size & 0xF) << 8) | ((base >> 24) & 0x3F) |
-		(1 << 6));
+		(1 << 6)) | 0xf00;
 	writel(config7_value, &cs->config7);
 	sdelay(2000);
 }
