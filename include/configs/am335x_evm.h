@@ -254,6 +254,7 @@
 #define CONFIG_SYS_TEXT_BASE		0x08000000
 #endif
 
+#ifdef CONFIG_USB
 /*
  * USB configuration.  We enable MUSB support, both for host and for
  * gadget.  We set USB0 as peripheral and USB1 as host, based on the
@@ -285,6 +286,7 @@
 #define CONFIG_USB_ETH_RNDIS
 #define CONFIG_USBNET_HOST_ADDR	"de:ad:be:af:00:00"
 #endif /* CONFIG_USB_MUSB_GADGET */
+#endif /* CONFIG_USB */
 
 /*
  * Disable MMC DM for SPL build and can be re-enabled after adding
