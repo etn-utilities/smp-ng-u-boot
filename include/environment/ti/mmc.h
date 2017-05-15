@@ -28,17 +28,13 @@
 	"envboot=mmc dev ${mmcdev}; " \
 		"if mmc rescan; then " \
 			"echo SD/MMC found on device ${mmcdev};" \
-			"if run loadbootscript; then " \
-				"run bootscript;" \
-			"else " \
-				"if run loadbootenv; then " \
-					"echo Loaded env from ${bootenvfile};" \
-					"run importbootenv;" \
-				"fi;" \
-				"if test -n $uenvcmd; then " \
-					"echo Running uenvcmd ...;" \
-					"run uenvcmd;" \
-				"fi;" \
+			"if run loadbootenv; then " \
+				"echo Loaded env from ${bootenvfile};" \
+				"run importbootenv;" \
+			"fi;" \
+			"if test -n $uenvcmd; then " \
+				"echo Running uenvcmd ...;" \
+				"run uenvcmd;" \
 			"fi;" \
 		"fi;\0" \
 	"mmcloados=run args_mmc; " \
