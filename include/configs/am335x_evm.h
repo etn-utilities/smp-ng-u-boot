@@ -93,6 +93,14 @@
 	BOOT_TARGET_PXE(func) \
 	BOOT_TARGET_DHCP(func)
 
+#define CONFIG_BOOTCOMMAND \
+	"run envboot; " \
+	"setenv mmcdev 1; " \
+	"run envboot; " \
+	"setenv mmcdev 0; " \
+	"run findfdt; " \
+	"run distro_bootcmd"
+
 #include <config_distro_bootcmd.h>
 
 #ifndef CONFIG_SPL_BUILD
