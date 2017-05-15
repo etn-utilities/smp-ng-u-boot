@@ -84,12 +84,11 @@
 	func(DHCP, dhcp, na)
 
 #define CONFIG_BOOTCOMMAND \
-	"if test ${boot_fit} -eq 1; then "	\
-		"run update_to_fit;"	\
-	"fi;"	\
-	"run findfdt; " \
-	"run init_console; " \
 	"run envboot; " \
+	"setenv mmcdev 1; " \
+	"run envboot; " \
+	"setenv mmcdev 0; " \
+	"run findfdt; " \
 	"run distro_bootcmd"
 
 #include <config_distro_bootcmd.h>
