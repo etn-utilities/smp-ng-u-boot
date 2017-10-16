@@ -1,0 +1,6 @@
+AM335X_genepi BOARD
+M:	Ronald Landheer-Cieslak <ronaldlandheercieslak@eaton.com
+S:	Maintained
+F:	board/eaton/am335x_genepi/
+F:	include/configs/am335x_genepi.h
+F:	configs/am335x_genepi_defconfig
