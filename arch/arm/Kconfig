@@ -1126,6 +1126,7 @@ source "board/vscom/baltos/Kconfig"
 source "board/woodburn/Kconfig"
 source "board/work-microwave/work_92105/Kconfig"
 source "board/zipitz2/Kconfig"
+source "board/eaton/am335x_genepi/Kconfig"
 
 source "arch/arm/Kconfig.debug"
 
