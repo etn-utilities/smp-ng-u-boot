@@ -97,7 +97,7 @@
 	"optargs=\0" \
 	"mmcdev=0\0" \
 	"mmcroot=/dev/mmcblk0p2 ro\0" \
-	"mmcrootfstype=ext4 rootwait\0" \
+	"mmcrootfstype=ext4\0" \
 	"rootpath=/export/rootfs\0" \
 	"nfsopts=nolock\0" \
 	"mmcargs=setenv bootargs console=${console} " \
