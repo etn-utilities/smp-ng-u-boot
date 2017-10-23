@@ -93,7 +93,7 @@
 	"bootdir=/boot\0" \
 	"bootfile=zImage\0" \
 	"fdtfile=am335x-io2200.dtb\0" \
-	"console=ttyS0,115200n8\0" \
+	"console=ttyS0,115200n8 earlyprintk debug\0" \
 	"optargs=\0" \
 	"mmcdev=0\0" \
 	"mmcroot=/dev/mmcblk0p2 ro\0" \
