@@ -68,8 +68,8 @@ static struct module_pin_mux uart3_pin_mux[] = {
 };
 
 static struct module_pin_mux uart4_pin_mux[] = {
-	{OFFSET(gpmc_wait0), (MODE(6) | PULLUP_EN | RXACTIVE)},	/* UART4_RXD */
-	{OFFSET(gpmc_wpn), (MODE(6) | PULLUDEN)},		/* UART4_TXD */
+	{OFFSET(uart0_ctsn), (MODE(1) | PULLUP_EN | RXACTIVE)},	/* UART4_RXD */
+	{OFFSET(uart0_rtsn), (MODE(1) | PULLUDEN)},		/* UART4_TXD */
 	{-1},
 };
 
