@@ -240,6 +240,7 @@ int board_init(void)
   
 #if defined(CONFIG_HW_WATCHDOG)
 	hw_watchdog_init();
+	hw_watchdog_disable();
 #endif
 
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
