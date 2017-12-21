@@ -24,6 +24,8 @@
 #define M_NAND_EATON_GPMC_CONFIG6	0x02000780
 #define M_NAND_EATON_GPMC_CONFIG7	0
 
+#define CONFIG_SYS_NAND_BASE	0x82000000 /*HERE*/
+
 /*DDR3 timing definition*/
 /* IS43TR16640B15GBLI 400 MHz*/
 /*based on -15H memory speed grade as recommended by TI*/
