@@ -26,6 +26,8 @@
 # define CONFIG_LZO
 #endif
 
+#define CONFIG_SPL_FRAMEWORK
+
 /* set max size to 128 MiB */
 #define CONFIG_SYS_BOOTM_LEN		(16 << 19)
 
@@ -196,6 +198,7 @@
 					"128k(NAND.u-boot-env.backup1)," \
 					"8m(NAND.kernel)," \
 					"-(NAND.file-system)"
+#define CONFIG_SYS_NAND_BASE		0x00080000
 #define CONFIG_SYS_NAND_U_BOOT_OFFS	0x000c0000
 /* NAND: SPL related configs */
 #ifdef CONFIG_SPL_NAND_SUPPORT
@@ -214,6 +217,7 @@
  */
 #ifdef CONFIG_NOR_BOOT
 #define CONFIG_SYS_TEXT_BASE		0x08000000
+#define CONFIG_SYS_UBOOT_BASE		0x08000000
 #endif
 
 #ifdef CONFIG_USB
@@ -291,7 +295,7 @@
 #define CONFIG_SPL_SPI_LOAD
 #define CONFIG_SYS_SPI_U_BOOT_OFFS	0x20000
 
-#define CONFIG_ENV_IS_IN_SPI_FLASH
+/*#define CONFIG_ENV_IS_IN_SPI_FLASH*/
 #define CONFIG_SYS_REDUNDAND_ENVIRONMENT
 #define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SF_DEFAULT_SPEED
 #define CONFIG_ENV_SECT_SIZE		(4 << 10) /* 4 KB sectors */
@@ -302,6 +306,7 @@
 					"512k(u-boot),128k(u-boot-env1)," \
 					"128k(u-boot-env2),3464k(kernel)," \
 					"-(rootfs)"
+#define CONFIG_SYS_NAND_U_BOOT_OFFS	 0x000c0000
 #elif defined(CONFIG_EMMC_BOOT)
 #define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_SYS_MMC_ENV_DEV		1
