@@ -13,6 +13,7 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
+#include <config.h>
 #include <common.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
@@ -24,14 +25,111 @@
 
 const struct gpmc *gpmc_cfg = (struct gpmc *)GPMC_BASE;
 
+#if defined(GPMC_CS0_FLASH)
+char gpmc_cs0_flash = GPMC_CS0_FLASH;
+#	if GPMC_CS0_FLASH == MTD_DEV_TYPE_NOR
+#		ifndef GPMC_WAIT1PIN_POLARITY
+#			define GPMC_WAIT1PIN_POLARITY 0
+#		endif
+#		ifndef GPMC_WAIT0PIN_POLARITY
+#			define GPMC_WAIT0PIN_POLARITY 1
+#		endif
+#		ifndef GPMC_WRITE_PROTECT_POLARITY
+#			define GPMC_WRITE_PROTECT_POLARITY 0
+#		endif
+#		ifndef GPMC_LIMITED_ADDRESS
+#			define GPMC_LIMITED_ADDRESS 0
+#		endif
+#		ifndef GPMC_NAND_FORCE_POSTED_WRITE
+#			define GPMC_NAND_FORCE_POSTED_WRITE 0
+#		endif
+#	else
+#		ifndef GPMC_WAIT1PIN_POLARITY
+#			define GPMC_WAIT1PIN_POLARITY 0
+#		endif
+#		ifndef GPMC_WAIT0PIN_POLARITY
+#			define GPMC_WAIT0PIN_POLARITY 0
+#		endif
+#		ifndef GPMC_WRITE_PROTECT_POLARITY
+#			define GPMC_WRITE_PROTECT_POLARITY 1
+#		endif
+#		ifndef GPMC_LIMITED_ADDRESS
+#			define GPMC_LIMITED_ADDRESS 1
+#		endif
+#		ifndef GPMC_NAND_FORCE_POSTED_WRITE
+#			define GPMC_NAND_FORCE_POSTED_WRITE 0
+#		endif
+#	endif
+#else
 #if defined(CONFIG_NOR)
 char gpmc_cs0_flash = MTD_DEV_TYPE_NOR;
+#	ifndef GPMC_WAIT1PIN_POLARITY
+#		define GPMC_WAIT1PIN_POLARITY 0
+#	endif
+#	ifndef GPMC_WAIT0PIN_POLARITY
+#		define GPMC_WAIT0PIN_POLARITY 1
+#	endif
+#	ifndef GPMC_WRITE_PROTECT_POLARITY
+#		define GPMC_WRITE_PROTECT_POLARITY 0
+#	endif
+#	ifndef GPMC_LIMITED_ADDRESS
+#		define GPMC_LIMITED_ADDRESS 0
+#	endif
+#	ifndef GPMC_NAND_FORCE_POSTED_WRITE
+#		define GPMC_NAND_FORCE_POSTED_WRITE 0
+#	endif
 #elif defined(CONFIG_NAND) || defined(CONFIG_CMD_NAND)
 char gpmc_cs0_flash = MTD_DEV_TYPE_NAND;
+#	ifndef GPMC_WAIT1PIN_POLARITY
+#		define GPMC_WAIT1PIN_POLARITY 0
+#	endif
+#	ifndef GPMC_WAIT0PIN_POLARITY
+#		define GPMC_WAIT0PIN_POLARITY 0
+#	endif
+#	ifndef GPMC_WRITE_PROTECT_POLARITY
+#		define GPMC_WRITE_PROTECT_POLARITY 1
+#	endif
+#	ifndef GPMC_LIMITED_ADDRESS
+#		define GPMC_LIMITED_ADDRESS 1
+#	endif
+#	ifndef GPMC_NAND_FORCE_POSTED_WRITE
+#		define GPMC_NAND_FORCE_POSTED_WRITE 0
+#	endif
 #elif defined(CONFIG_CMD_ONENAND)
 char gpmc_cs0_flash = MTD_DEV_TYPE_ONENAND;
+#	ifndef GPMC_WAIT1PIN_POLARITY
+#		define GPMC_WAIT1PIN_POLARITY 0
+#	endif
+#	ifndef GPMC_WAIT0PIN_POLARITY
+#		define GPMC_WAIT0PIN_POLARITY 0
+#	endif
+#	ifndef GPMC_WRITE_PROTECT_POLARITY
+#		define GPMC_WRITE_PROTECT_POLARITY 1
+#	endif
+#	ifndef GPMC_LIMITED_ADDRESS
+#		define GPMC_LIMITED_ADDRESS 1
+#	endif
+#	ifndef GPMC_NAND_FORCE_POSTED_WRITE
+#		define GPMC_NAND_FORCE_POSTED_WRITE 0
+#	endif
 #else
 char gpmc_cs0_flash = -1;
+#	ifndef GPMC_WAIT1PIN_POLARITY
+#		define GPMC_WAIT1PIN_POLARITY 0
+#	endif
+#	ifndef GPMC_WAIT0PIN_POLARITY
+#		define GPMC_WAIT0PIN_POLARITY 0
+#	endif
+#	ifndef GPMC_WRITE_PROTECT_POLARITY
+#		define GPMC_WRITE_PROTECT_POLARITY 1
+#	endif
+#	ifndef GPMC_LIMITED_ADDRESS
+#		define GPMC_LIMITED_ADDRESS 1
+#	endif
+#	ifndef GPMC_NAND_FORCE_POSTED_WRITE
+#		define GPMC_NAND_FORCE_POSTED_WRITE 0
+#	endif
+#endif
 #endif
 
 #if defined(CONFIG_OMAP34XX)
@@ -74,8 +172,9 @@ void enable_gpmc_cs_config(const u32 *gpmc_config, const struct gpmc_cs *cs,
 	writel(gpmc_config[4], &cs->config5);
 	writel(gpmc_config[5], &cs->config6);
 	/* Enable the config */
-	writel((((size & 0xF) << 8) | ((base >> 24) & 0x3F) |
-		(1 << 6)), &cs->config7);
+	config7_value = (((size & 0xF) << 8) | ((base >> 24) & 0x3F) |
+		(1 << 6));
+	writel(config7_value, &cs->config7);
 	sdelay(2000);
 }
 
@@ -102,7 +201,7 @@ void set_gpmc_cs0(int flash_type)
 		M_NAND_GPMC_CONFIG4,
 		M_NAND_GPMC_CONFIG5,
 		M_NAND_GPMC_CONFIG6,
-		0
+		M_NAND_GPMC_CONFIG7,
 	};
 #endif
 #if defined(CONFIG_CMD_ONENAND)
@@ -133,7 +232,11 @@ void set_gpmc_cs0(int flash_type)
 	case MTD_DEV_TYPE_NAND:
 		gpmc_regs = gpmc_regs_nand;
 		base = CONFIG_SYS_NAND_BASE;
-		size = GPMC_SIZE_16M;
+		size = (CONFIG_SYS_NAND_SIZE > 0x08000000) ? GPMC_SIZE_256M :
+		      ((CONFIG_SYS_NAND_SIZE > 0x04000000) ? GPMC_SIZE_128M :
+		      ((CONFIG_SYS_NAND_SIZE > 0x02000000) ? GPMC_SIZE_64M  :
+		      ((CONFIG_SYS_NAND_SIZE > 0x01000000) ? GPMC_SIZE_32M  :
+		                                             GPMC_SIZE_16M)));
 		break;
 #endif
 #if defined(CONFIG_CMD_ONENAND)
@@ -161,14 +264,20 @@ void set_gpmc_cs0(int flash_type)
  *****************************************************/
 void gpmc_init(void)
 {
+	u32 config = 0x00000000;
+
 	/* global settings */
-	writel(0x00000008, &gpmc_cfg->sysconfig);
-	writel(0x00000000, &gpmc_cfg->irqstatus);
-	writel(0x00000000, &gpmc_cfg->irqenable);
+	writel(0x00000008, &gpmc_cfg->sysconfig); /* set only SIDLEMODE, set to No-idle */
+	writel(0x00000000, &gpmc_cfg->irqstatus); /* no-op */
+	writel(0x00000000, &gpmc_cfg->irqenable); /* disable all interrupts */
 	/* disable timeout, set a safe reset value */
-	writel(0x00001ff0, &gpmc_cfg->timeout_control);
-	writel(gpmc_cs0_flash == MTD_DEV_TYPE_NOR ?
-		0x00000200 : 0x00000012, &gpmc_cfg->config);
+	writel(0x00001ff0, &gpmc_cfg->timeout_control); /* disable timeout feature, set time-out to maximum */
+	config |= (GPMC_WAIT1PIN_POLARITY ? 0x00000200 : 0x00000000);
+	config |= (GPMC_WAIT0PIN_POLARITY ? 0x00000100 : 0x00000000);
+	config |= (GPMC_WRITE_PROTECT_POLARITY ? 0x00000000 : 0x00000010); /* WP on */
+	config |= (GPMC_LIMITED_ADDRESS ? 0x00000002 : 0x00000000);
+	config |= (GPMC_NAND_FORCE_POSTED_WRITE ? 0x00000001 : 0x00000000);
+	writel(config, &gpmc_cfg->config);
 
 	set_gpmc_cs0(gpmc_cs0_flash);
 }
