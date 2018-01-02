@@ -53,9 +53,10 @@ struct bch_res_4_6 {
 };
 
 struct gpmc {
-	u8 res1[0x10];
+	u32 revision;		/* 0x00 */
+	u8 res1[0xc];
 	u32 sysconfig;		/* 0x10 */
-	u8 res2[0x4];
+	u32 sysstatus;		/* 0x14 */
 	u32 irqstatus;		/* 0x18 */
 	u32 irqenable;		/* 0x1C */
 	u8 res3[0x20];
