@@ -21,21 +21,24 @@
 
 #include <configs/ti_am335x_common.h>
 
+/* Main PLL Fdll = 300 MHz on Genepi */
+#define CONFIG_SYS_MPUCLK	MPUPLL_M_300
+
 /* Nandflash timing definition */
 /* CONFIG 7 is at 0 because it is configured by the calling function*/
 #define M_NAND_GPMC_CONFIG1	0x00000800
 #define M_NAND_GPMC_CONFIG2	0x00050500
-#define M_NAND_GPMC_CONFIG3	0x00050501
+#define M_NAND_GPMC_CONFIG3	0x00050401
 #define M_NAND_GPMC_CONFIG4	0x04000600
 #define M_NAND_GPMC_CONFIG5	0x00070909
 #define M_NAND_GPMC_CONFIG6	0x84000000
 #define M_NAND_GPMC_CONFIG7	0x00000F48
 
 /* polarity 1 = active low; 0 is active high */
-#define GPMC_WAIT1PIN_POLARITY 0
-#define GPMC_WAIT0PIN_POLARITY 1
-#define GPMC_WRITE_PROTECT_POLARITY 1
-#define GPMC_LIMITED_ADDRESS 1
+#define GPMC_WAIT1PIN_POLARITY 1
+#define GPMC_WAIT0PIN_POLARITY 0
+#define GPMC_WRITE_PROTECT_POLARITY 0
+#define GPMC_LIMITED_ADDRESS 0
 #define GPMC_NAND_FORCE_POSTED_WRITE 0
 
 
