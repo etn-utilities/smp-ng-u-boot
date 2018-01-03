@@ -127,7 +127,6 @@ static struct module_pin_mux rgmii1_pin_mux[] = {
 	{-1},
 };
 
-#ifdef CONFIG_NAND
 static struct module_pin_mux nand_pin_mux[] = {
 	{OFFSET(gpmc_ad0),	(MODE(0) | PULLUDDIS | RXACTIVE)}, /* AD0  */
 	{OFFSET(gpmc_ad1),	(MODE(0) | PULLUDDIS | RXACTIVE)}, /* AD1  */
@@ -156,7 +155,7 @@ static struct module_pin_mux nand_pin_mux[] = {
 	{OFFSET(gpmc_be0n_cle),	(MODE(0) | PULLDOWN_EN)},	   /* BE_CLE */
 	{-1},
 };
-#elif defined(CONFIG_NOR)
+#if defined(CONFIG_NOR)
 static struct module_pin_mux bone_norcape_pin_mux[] = {
 	{OFFSET(gpmc_a0), MODE(0) | PULLUDDIS},			/* NOR_A0 */
 	{OFFSET(gpmc_a1), MODE(0) | PULLUDDIS},			/* NOR_A1 */
@@ -258,10 +257,8 @@ void enable_board_pin_mux()
 	// Config NOR (boot from SPI)
 	configure_module_pin_mux(spi0_pin_mux);
 	
-#ifdef CONFIG_NAND
 	// CONFIG_NAND ?
 	configure_module_pin_mux(nand_pin_mux);	
-#endif
 
 	// I2C bus
 	enable_i2c0_pin_mux();
