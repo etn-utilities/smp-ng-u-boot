@@ -65,6 +65,15 @@
 #define V_OSCK				25000000  /* Clock output from T2 */
 #define V_SCLK				(V_OSCK)
 
+#define MTDIDS_DEFAULT			"nand0=s34ml02g2"
+#define MTDPARTS_DEFAULT		"mtdparts=s34ml02g2:"\
+	"128k(private-store)," \
+	"4096k(kernel-ses)," \
+	"4096k(kernel-sep)," \
+	"128k(dtb-ses)," \
+	"128k(dtb-sep)," \
+	"1024k(prod)," \
+	"-(rootfs)"
 /*
  * We setup defaults based on constraints from the Linux kernel, which should
  * also be safe elsewhere.  We have the default load at 32MB into DDR (for
@@ -117,6 +126,8 @@
 #ifndef CONFIG_SPL_BUILD
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	GENEPI_LINUX_BOOT_ENV \
+	"mtdids=" MTDIDS_DEFAULT "\0" \
+	"mtdparts=" MTDPARTS_DEFAULT "\0" \
 	"boot_fdt=try\0" \
 	"bootpart=0:2\0" \
 	"bootdir=/boot\0" \
