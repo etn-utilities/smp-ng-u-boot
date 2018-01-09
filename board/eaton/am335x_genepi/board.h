@@ -14,17 +14,6 @@
 
 #define HDR_NAME_LEN		8
 
-/* Nandflash timing definition */
-/* CONFIG 7 is at 0 because it is configured by the calling function*/
-#define M_NAND_EATON_GPMC_CONFIG1	0x00000800
-#define M_NAND_EATON_GPMC_CONFIG2	0x00040300
-#define M_NAND_EATON_GPMC_CONFIG3	0x00040300
-#define M_NAND_EATON_GPMC_CONFIG4	0x02800200
-#define M_NAND_EATON_GPMC_CONFIG5	0x00020403
-#define M_NAND_EATON_GPMC_CONFIG6	0x02000780
-#define M_NAND_EATON_GPMC_CONFIG7	0
-
-#define CONFIG_SYS_NAND_BASE	0x82000000 /*HERE*/
 
 /*DDR3 timing definition*/
 /* IS43TR16640B15GBLI 400 MHz*/

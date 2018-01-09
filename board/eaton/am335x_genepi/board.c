@@ -36,6 +36,8 @@
 #include <watchdog.h>
 #include <environment.h>
 #include "board.h"
+#include <linux/mtd/nand.h>
+#include <linux/mtd/omap_gpmc.h>
 #include "configs/am335x_genepi.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -196,33 +198,6 @@ void sdram_init(void)
 }
 #endif
 
-/*
- * USB threshold setting.
- */
-void usb_threshold_mngt(void)
-{
-	unsigned int gpio;
-	gpio_lookup_name("GPIO0_20", NULL, NULL, &gpio);
-	gpio_request(gpio, "cmd_gpio");
-	gpio_direction_output(gpio, 0);
-	gpio_lookup_name("GPIO3_20", NULL, NULL, &gpio);
-	gpio_request(gpio, "cmd_gpio");
-	gpio_direction_output(gpio, 0);
-}
-
-/* Timing definitions for nanflash */
-#if defined(CONFIG_NOR) || defined(CONFIG_NAND)
-static const u32 gpmc_nandflash[GPMC_MAX_REG] = {
-	M_NAND_EATON_GPMC_CONFIG1,
-	M_NAND_EATON_GPMC_CONFIG2,
-	M_NAND_EATON_GPMC_CONFIG3,
-	M_NAND_EATON_GPMC_CONFIG4,
-	M_NAND_EATON_GPMC_CONFIG5,
-	M_NAND_EATON_GPMC_CONFIG6,
-	M_NAND_EATON_GPMC_CONFIG7,
-};
-#endif
-
 void genepi_mcu_board_init(unsigned short mpuSpeed)
 {
   dpll_mpu_opp100.m = mpuSpeed;  
@@ -234,10 +209,6 @@ void genepi_mcu_board_init(unsigned short mpuSpeed)
  */
 int board_init(void)
 {
-#if defined(CONFIG_NOR) || defined(CONFIG_NAND)
-  struct gpmc *gpmc_cfg;
-#endif
-  
 #if defined(CONFIG_HW_WATCHDOG)
 	hw_watchdog_init();
 	hw_watchdog_disable();
@@ -246,15 +217,10 @@ int board_init(void)
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
 #if defined(CONFIG_NOR) || defined(CONFIG_NAND)
   gpmc_init();
-  /*above gpmc_init program default uboot timing*/
-  /*below enable_gpmc_cs_config function overwrite it with value from gpmc_nandflash*/
-  gpmc_cfg = (struct gpmc *)GPMC_BASE; 
-  enable_gpmc_cs_config(gpmc_nandflash, &gpmc_cfg->cs[0],
-		CONFIG_SYS_NAND_BASE, GPMC_SIZE_16M);
 #endif
-
+/*
 	usb_threshold_mngt();
-    
+  */  
 	return 0;
 }
 
@@ -425,16 +391,7 @@ int board_eth_init(bd_t *bis)
 		n += rv;
 #endif
 	return n;
-
-	
-	return 0;
 }	 
 
 #endif
-
-
-
-
-
-
 
