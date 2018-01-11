@@ -88,7 +88,8 @@
 	"kernel_addr_r=0x82000000\0" \
 	"fdtaddr=0x87000000\0" \
 	"fdt_addr_r=0x87000000\0" \
-	"bootm_size=0x8000000\0"
+	"bootm_size=0x8000000\0" \
+	"zimage_magic_number_addr=0x82000024\0"
 
 /* Custom script for NOR */
 #define CONFIG_SYS_LDSCRIPT		"board/eaton/am335x_genepi/u-boot.lds"
@@ -121,7 +122,7 @@
 	func(MMC, mmc, 0) 
 
 #define CONFIG_BOOTCOMMAND \
-	"run mmcboot; " 
+	"run mmcboot; run nandboot;" 
 
 #ifndef CONFIG_SPL_BUILD
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -140,10 +141,22 @@
 	"mmcrootfstype=ext4\0" \
 	"rootpath=/export/rootfs\0" \
 	"nfsopts=nolock\0" \
+	"bootcountaddr=0xB0000000\0" \
+	"bootlimit=3\0" \
+	"bootcount=0\0" \
+	"bootchoice=0\0" \
+	"kernelmagicnumber=0x16f2818\0" \
+	"kernelimagevalid=0\0" \
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"root=${mmcroot} " \
 		"rootfstype=${mmcrootfstype}\0" \
+	"nandroot=/dev/mtdblock6\0 " \
+	"nandrootfstype=ext4\0 " \
+	"nandargs=setenv bootargs console=${console}" \
+		"${optargs} " \
+		"root=${nandroot} " \
+		"rootfstype=${nandrootfstype}\0" \
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
 	"loadfdt=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${fdtfile}\0" \
 	"mmcloados=run mmcargs; " \
@@ -160,6 +173,31 @@
 		"else " \
 			"bootz; " \
 		"fi;\0" \
+	"altbootcmd=echo allo\0" \
+	"selectboot=nand read ${bootcountaddr} private-store 0x1; " \
+		"if itest.b *${bootcountaddr} >= ${bootlimit}; then " \
+			"setenv bootchoice 0; " \
+		"fi; " \
+		"setexpr.b bootcount *${bootcountaddr} + 1; " \
+		"nand erase.part private-store; " \
+		"mw ${bootcountaddr} ${bootcount} 0x1; " \
+		"nand write ${bootcountaddr} private-store 0x1;\0" \
+	"testzimage=if itest.l *${zimage_magic_number_addr} == ${kernelmagicnumber};" \
+			"then setenv kernelimagevalid 1; " \
+		"fi;\0" \
+	"nandboot=run selectboot; " \
+		"if itest.b ${bootchoice} == 1; then " \
+			"nand read.i $loadaddr kernel-ses; " \
+			"nand read.i $fdtaddr dtb-ses;" \
+		"else " \
+			"nand read.i $loadaddr kernel-sep; " \
+			"nand read.i $fdtaddr dtb-sep;" \
+		"fi; " \
+		"run testzimage; " \
+		"if itest.b ${kernelimagevalid} == 1; then " \
+			"run nandargs; " \
+			"bootz $loadaddr - ${fdtaddr}; " \
+		"fi; \0" \
 	"mmcboot= mmc dev ${mmcdev}; " \
 			"if mmc rescan; then " \
 				"echo SD/MMC found on device ${mmcdev};" \

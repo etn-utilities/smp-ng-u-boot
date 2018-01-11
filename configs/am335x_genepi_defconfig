@@ -28,7 +28,7 @@ CONFIG_CMD_SPI=y
 # CONFIG_CMD_USB is not set
 # CONFIG_CMD_DFU is not set
 CONFIG_CMD_GPIO=y
-# CONFIG_CMD_SETEXPR is not set
+CONFIG_CMD_SETEXPR=y
 # CONFIG_CMD_EXT4_WRITE is not set
 # CONFIG_DFU_TFTP is not set
 # CONFIG_DFU_MMC is not set
