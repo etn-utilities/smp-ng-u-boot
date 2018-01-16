@@ -73,6 +73,7 @@
 	"128k(dtb-ses)," \
 	"128k(dtb-sep)," \
 	"1024k(prod)," \
+	"65536k(boot)," \
 	"-(rootfs)"
 /*
  * We setup defaults based on constraints from the Linux kernel, which should
