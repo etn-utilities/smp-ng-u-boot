@@ -21,6 +21,8 @@
 
 #include <configs/ti_am335x_common.h>
 
+#define CONFIG_SPI_FLASH_ISSI
+
 /* Main PLL Fdll = 300 MHz on Genepi */
 #define CONFIG_SYS_MPUCLK	MPUPLL_M_300
 
