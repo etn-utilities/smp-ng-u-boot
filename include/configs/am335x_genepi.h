@@ -125,7 +125,11 @@
 	func(MMC, mmc, 0) 
 
 #define CONFIG_BOOTCOMMAND \
-	"run mmcboot; run nandboot;" 
+	"if test ${boot_source} = \"SPI\"; then " \
+		"run nandboot; " \
+	"else "\
+		"run mmcboot; " \
+	"fi;"
 
 #ifndef CONFIG_SPL_BUILD
 #define CONFIG_EXTRA_ENV_SETTINGS \

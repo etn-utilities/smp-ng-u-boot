@@ -41,7 +41,6 @@
 #include "configs/am335x_genepi.h"
 
 DECLARE_GLOBAL_DATA_PTR;
-
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
 
 /*  Genepi DDR 400 MHz Configuration */
@@ -224,9 +223,51 @@ int board_init(void)
 	return 0;
 }
 
+int save_boot_source(void)
+{
+	u32 boot_params = *((u32 *)(SRAM_SCRATCH_SPACE_ADDR + 0x24));
+	struct omap_boot_parameters *omap_boot_params;
+	int sys_boot_device = 0;
+	u32 boot_device;
+	if ((boot_params < NON_SECURE_SRAM_START) ||
+	    (boot_params > NON_SECURE_SRAM_END))
+		return;
+
+	omap_boot_params = (struct omap_boot_parameters *)boot_params;
+
+	boot_device = omap_boot_params->boot_device;
+	switch ( boot_device ){
+		case BOOT_DEVICE_SPI:
+			printf("Booting from: SPI\n");
+			setenv("boot_source", "SPI");
+		break;
+		case BOOT_DEVICE_MMC1:
+			printf("Booting from: MMC1\n");
+			setenv("boot_source", "MMC1");
+		break;
+		case BOOT_DEVICE_MMC2:
+			printf("Booting from: MMC2\n");
+			setenv("boot_source", "MMC2");
+		break;
+		case BOOT_DEVICE_NAND:
+			printf("Booting from: NAND\n");
+			setenv("boot_source", "NAND");
+		break;
+		case BOOT_DEVICE_NAND_I2C:
+			printf("Booting from: NAND I2C\n");
+			setenv("boot_source", "I2C");
+		break;
+		default:
+			printf("Booting from: unknown\n");
+			setenv("boot_source", "0");
+		break;
+	}
+
+	return 0;
+}
+
 #ifdef CONFIG_BOARD_LATE_INIT
 #define BOARD_NAME "Genepi"
-
 int board_late_init(void)
 {
 	char safe_string[HDR_NAME_LEN + 1];
@@ -236,6 +277,7 @@ int board_late_init(void)
 	safe_string[sizeof(BOARD_NAME)] = 0;
 	setenv("board_name", safe_string);
 	setenv("bootdelay", "2");
+	save_boot_source();
 
 	return 0;
 }
