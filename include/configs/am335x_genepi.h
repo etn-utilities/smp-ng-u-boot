@@ -145,7 +145,6 @@
 	"rootpath=/export/rootfs\0" \
 	"nfsopts=nolock\0" \
 	"bootcountaddr=0xB0000000\0" \
-	"bootlimit=3\0" \
 	"bootcount=0\0" \
 	"bootchoice=0\0" \
 	"kernelmagicnumber=0x16f2818\0" \
@@ -176,7 +175,6 @@
 		"else " \
 			"bootz; " \
 		"fi;\0" \
-	"altbootcmd=echo allo\0" \
 	"selectboot=nand read ${bootcountaddr} private-store 0x1; " \
 		"if itest.b *${bootcountaddr} >= ${bootlimit}; then " \
 			"setenv bootchoice 0; " \
