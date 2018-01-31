@@ -156,13 +156,15 @@
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"root=${mmcroot} " \
-		"rootfstype=${mmcrootfstype}\0" \
+		"rootfstype=${mmcrootfstype} " \
+		"image_type=SEP\0" \
 	"nandroot=/dev/mtdblock6\0 " \
 	"nandrootfstype=ext4\0 " \
 	"nandargs=setenv bootargs console=${console}" \
 		"${optargs} " \
 		"root=${nandroot} " \
-		"rootfstype=${nandrootfstype}\0" \
+		"rootfstype=${nandrootfstype} " \
+		"image_type=SEP\0" \
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
 	"loadfdt=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${fdtfile}\0" \
 	"mmcloados=run mmcargs; " \
