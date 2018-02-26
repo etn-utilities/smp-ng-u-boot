@@ -70,12 +70,12 @@
 #define MTDIDS_DEFAULT			"nand0=s34ml02g2"
 #define MTDPARTS_DEFAULT		"mtdparts=s34ml02g2:"\
 	"128k(private-store)," \
-	"4096k(kernel-ses)," \
-	"4096k(kernel-sep)," \
+	"5120k(kernel-ses)," \
+	"5120k(kernel-sep)," \
 	"128k(dtb-ses)," \
 	"128k(dtb-sep)," \
 	"1024k(prod)," \
-	"65536k(boot)," \
+	"131072k(boot)," \
 	"-(rootfs)"
 /*
  * We setup defaults based on constraints from the Linux kernel, which should
