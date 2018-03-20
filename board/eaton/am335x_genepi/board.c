@@ -39,6 +39,10 @@
 #include <linux/mtd/nand.h>
 #include <linux/mtd/omap_gpmc.h>
 #include "configs/am335x_genepi.h"
+#include <linux/mtd/mtd.h>
+#include <jffs2/jffs2.h>
+#include <nand.h>
+#include <command.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
@@ -266,11 +270,78 @@ int save_boot_source(void)
 	return 0;
 }
 
+int write_nand_boot_data(struct eaton_boot_data_struct *boot_data)
+{
+
+	struct mtd_info *mtd;
+	nand_erase_options_t opts;
+	int dev = 0;
+	mtd = nand_info[0];
+	loff_t offset, size;
+	loff_t maxsize = sizeof(struct eaton_boot_data_struct);
+	int rc = 0;
+
+	if (mtd_arg_off	("private-store", &dev, &offset, &size, &maxsize, MTD_DEV_TYPE_NAND, nand_info[dev]->size)){
+		printf("error: mtd_arg_off\n");;
+	}
+
+	mtd = nand_info[0];
+	memset(&opts, 0, sizeof(opts));
+	opts.offset = offset;
+	opts.length = size;
+	opts.jffs2 = 0;
+	opts.quiet = 0;
+	opts.spread = 0;
+
+	rc = nand_erase_opts(mtd, &opts);
+	if (rc < 0) {
+		printf("error: erasing nand\n");
+		return rc;
+	}
+
+	size = sizeof(struct eaton_boot_data_struct);
+	rc = nand_write(nand_info[0], offset, (size_t *)&size, (uint8_t *)boot_data);
+	if (rc < 0)
+	{
+		printf("error: nand_write\n");
+		return rc;
+	}
+
+	return rc;
+}
+
+int read_nand_boot_data(struct eaton_boot_data_struct *boot_data)
+{
+	int dev = 0;
+	loff_t maxsize, offset;
+	size_t size;
+	int rc = 0;
+
+	if (mtd_arg_off	("private-store", &dev, &offset, (loff_t *)&size, &maxsize, MTD_DEV_TYPE_NAND, nand_info[dev]->size)){
+		printf("error: mtd_arg_off\n");
+		return -1;
+	}
+
+	size = sizeof(struct eaton_boot_data_struct);
+	rc = nand_read(nand_info[dev], offset, &size, (uint8_t *)boot_data);
+	if (rc < 0){
+		printf("error: failed reading from nand\n");
+		/* We don't return an error code at this point */
+		/* Returning an error here would brick the boot */
+	}
+
+	return 0;
+}
+
 #ifdef CONFIG_BOARD_LATE_INIT
 #define BOARD_NAME "Genepi"
 int board_late_init(void)
 {
 	char safe_string[HDR_NAME_LEN + 1];
+	struct eaton_boot_data_struct boot_data;
+	char boot_count_str[5];
+	char reset_flag_str[5];
+	int rc = 0;
 
 	/* Now set variables based on the header. */
 	strncpy(safe_string, BOARD_NAME, sizeof(BOARD_NAME));
@@ -278,6 +349,19 @@ int board_late_init(void)
 	setenv("board_name", safe_string);
 	setenv("bootdelay", "2");
 	save_boot_source();
+
+	rc = read_nand_boot_data(&boot_data);
+	if (rc < 0) {
+		printf("error reading from nand boot\n");
+		return -1;
+	} else {
+		sprintf(boot_count_str, "%d", boot_data.boot_count);
+		sprintf(reset_flag_str, "%d", boot_data.reset_flag);
+		printf("data: %s, %s\n", boot_count_str, reset_flag_str);
+
+		setenv("bootcounter", boot_count_str);
+		setenv("resetflag", reset_flag_str);
+	}
 
 	return 0;
 }
@@ -434,6 +518,36 @@ int board_eth_init(bd_t *bis)
 #endif
 	return n;
 }	 
+
+int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct eaton_boot_data_struct boot_data;
+	unsigned long boot_count_ul;
+	unsigned long reset_flag_ul;
+	int rc = 0;
+
+	if( argc != 3){
+		return -1;
+	}
+
+	boot_count_ul = simple_strtoul(argv[1], NULL, 10) + 1;
+	reset_flag_ul= simple_strtoul(argv[2], NULL, 10);
+
+	boot_data.boot_count = boot_count_ul > 255 ? 0 : (u8)boot_count_ul;
+	boot_data.reset_flag = reset_flag_ul > 255 ? 255 : (u8)reset_flag_ul;
+
+	rc = write_nand_boot_data(&boot_data);
+	if (rc < 0) {
+		printf("error writing to nand\n");
+		return -1;
+	}
+
+	return rc;
+}
+
+U_BOOT_CMD(save_boot_data, 3, 0, do_save_boot_data,
+			"save_boot_data - Save the bootstruct to nand memory. \n",
+			"save_boot_data boot_count boot_limit reset_flag\n The maximum value is 0xff or 255");
 
 #endif
 
