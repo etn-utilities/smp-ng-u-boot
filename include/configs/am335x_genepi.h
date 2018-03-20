@@ -148,8 +148,8 @@
 	"mmcrootfstype=ext4\0" \
 	"rootpath=/export/rootfs\0" \
 	"nfsopts=nolock\0" \
-	"bootcountaddr=0xB0000000\0" \
-	"bootcount=0\0" \
+	"bootcounter=0\0" \
+	"bootcounterlimit=3\0" \
 	"bootchoice=0\0" \
 	"kernelmagicnumber=0x16f2818\0" \
 	"kernelimagevalid=0\0" \
@@ -157,7 +157,8 @@
 		"${optargs} " \
 		"root=${mmcroot} " \
 		"rootfstype=${mmcrootfstype} " \
-		"image_type=SEP\0" \
+		"image_type=SEP " \
+		"factory_reset=${factory_reset}\0" \
 	"nandroot=/dev/mtdblock6\0 " \
 	"nandrootfstype=ext4\0 " \
 	"nandargs=setenv bootargs console=${console}" \
@@ -181,14 +182,12 @@
 		"else " \
 			"bootz; " \
 		"fi;\0" \
-	"selectboot=nand read ${bootcountaddr} private-store 0x1; " \
-		"if itest.b *${bootcountaddr} >= ${bootlimit}; then " \
+	"selectboot=if test ${bootcounter} > ${bootcounterlimit}; then " \
 			"setenv bootchoice 0; " \
-		"fi; " \
-		"setexpr.b bootcount *${bootcountaddr} + 1; " \
-		"nand erase.part private-store; " \
-		"mw ${bootcountaddr} ${bootcount} 0x1; " \
-		"nand write ${bootcountaddr} private-store 0x1;\0" \
+		"else " \
+			"setenv bootchoice 0; " \
+ 		"fi; " \
+		"save_boot_data ${bootcounter} ${resetflag}\0" \
 	"testzimage=if itest.l *${zimage_magic_number_addr} == ${kernelmagicnumber};" \
 			"then setenv kernelimagevalid 1; " \
 		"fi;\0" \
