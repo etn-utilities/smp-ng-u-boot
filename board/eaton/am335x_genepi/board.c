@@ -545,6 +545,13 @@ int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return rc;
 }
 
+int board_early_init_f(void) {
+	gd->flags |= (GD_FLG_SILENT | GD_FLG_DISABLE_CONSOLE);
+
+	return 0;
+
+}
+
 U_BOOT_CMD(save_boot_data, 3, 0, do_save_boot_data,
 			"save_boot_data - Save the bootstruct to nand memory. \n",
 			"save_boot_data boot_count boot_limit reset_flag\n The maximum value is 0xff or 255");

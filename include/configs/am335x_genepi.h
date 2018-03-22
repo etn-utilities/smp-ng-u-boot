@@ -23,6 +23,12 @@
 
 #define CONFIG_SPI_FLASH_ISSI
 
+/* Silent boot console */
+#define CONFIG_DISABLE_CONSOLE
+#define CONFIG_SILENT_CONSOLE
+#define CONFIG_SYS_DEVICE_NULLDEV
+#define CONFIG_BOARD_EARLY_INIT_F 1
+
 /* Main PLL Fdll = 300 MHz on Genepi */
 #define CONFIG_SYS_MPUCLK	MPUPLL_M_300
 
