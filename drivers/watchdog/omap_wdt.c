@@ -44,7 +44,7 @@
 #include <asm/arch/cpu.h>
 
 /* Hardware timeout in seconds */
-#define WDT_HW_TIMEOUT 60
+#define WDT_HW_TIMEOUT 300 /* 5 minutes */
 
 static unsigned int wdt_trgr_pattern = 0x1234;
 
