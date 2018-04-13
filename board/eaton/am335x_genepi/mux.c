@@ -21,7 +21,7 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/mux.h>
-#include <asm/arch/gpio.h>
+#include <asm/gpio.h>
 #include <asm/io.h>
 #include <i2c.h>
 #include <spl.h>
@@ -190,6 +190,12 @@ static struct module_pin_mux bone_norcape_pin_mux[] = {
 	{-1},
 };
 #endif
+
+static struct module_pin_mux ethernet_hard_reset_pin_mux[] = {
+	{OFFSET(gpmc_ad8),	(MODE(7) | PULLUP_EN | RXACTIVE | PULLUDEN)}, /* gpio1_24  */
+	{-1},
+};
+
 static struct module_pin_mux delay_reset_pin_mux[] = {
 	{OFFSET(gpmc_ad9), (MODE(7) | PULLUDDIS)}, /* DELAY_RESET */
 	{-1},
@@ -243,6 +249,11 @@ void enable_i2c0_pin_mux(void)
 	configure_module_pin_mux(i2c0_pin_mux);
 }
 
+void enable_ethernet_hard_reset_pin_mux(void)
+{
+	configure_module_pin_mux(ethernet_hard_reset_pin_mux);
+}
+
 void enable_usb_threshold_pin_mux(void)
 {
 	configure_module_pin_mux(gpio_usb_threshold_mux);
@@ -285,5 +296,7 @@ void enable_board_pin_mux()
 
 	configure_module_pin_mux(delay_reset_pin_mux);
 	configure_module_pin_mux(pf_latch_pin_mux);
+
+	enable_ethernet_hard_reset_pin_mux();
 }
 
