@@ -47,6 +47,8 @@
 DECLARE_GLOBAL_DATA_PTR;
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
 
+#define GPIO_TO_PIN(bank, gpio) (32 * (bank) + (gpio))
+
 /*  Genepi DDR 400 MHz Configuration */
 
 static const struct ddr_data ddr3_genepi400MHz_data = {
@@ -153,6 +155,8 @@ void set_uart_mux_conf(void)
 void set_mux_conf_regs(void)
 {
 	enable_board_pin_mux();
+	gpio_request(GPIO_TO_PIN(1, 24), "gpmc_ad8");
+	gpio_direction_output(GPIO_TO_PIN(1, 24), 1);
 }
 
 
