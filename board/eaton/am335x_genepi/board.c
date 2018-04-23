@@ -43,6 +43,7 @@
 #include <jffs2/jffs2.h>
 #include <nand.h>
 #include <command.h>
+#include <linux/delay.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
@@ -222,6 +223,51 @@ static void genepi_set_delay_reset_low()
 		printf("genepi_set_delay_reset_low: requesting pin %u (GPIO0_23) failed\n", gpio0_23);
 
 	gpio_direction_output(gpio0_23, 0);
+}
+
+/**
+ *  Returns 1 if GPIO0_26 value is 1 (high), return 0 otherwise
+ **/
+static int genepi_read_pflatch(void)
+{
+	int ret, value;
+	unsigned int gpio0_26 = GPIO_TO_PIN(0,26);
+
+	ret = gpio_request(gpio0_26, "gpmc_ad10");
+	if (ret && ret != -EBUSY) {
+		printf("genepi_read_pflatch: requesting pin %u (GPIO0_26) failed\n", gpio0_26);
+		return 0;
+	}
+
+	gpio_direction_input(gpio0_26);
+	value = gpio_get_value(gpio0_26);
+
+	gpio_free(gpio0_26);
+
+	return value;
+}
+
+/**
+ *  Returns 0 on success, otherwise -1
+ * */
+static int genepi_clear_pflatch()
+{
+	int ret;
+	unsigned int gpio2_22 = GPIO_TO_PIN(2,22);
+
+	ret = gpio_request(gpio2_22, "lcd_vsync");
+	if (ret && ret != -EBUSY) {
+		printf("genepi_clear_pflatch: requesting pin %u (GPIO2_22) failed\n", gpio2_22);
+		return -1;
+	}
+
+	gpio_direction_output(gpio2_22, 1);
+	mdelay(5);
+
+	gpio_set_value(gpio2_22, 0);
+	gpio_free(gpio2_22);
+
+	return 0;
 }
 
 /*
@@ -541,19 +587,33 @@ int board_eth_init(bd_t *bis)
 int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct eaton_boot_data_struct boot_data;
-	unsigned long boot_count_ul;
-	unsigned long reset_flag_ul;
+	unsigned long boot_count;
+	unsigned long reset_flag;
+	int read_pflatch_count = 0;
 	int rc = 0;
 
-	if( argc != 3){
+	if ( argc != 3){
 		return -1;
 	}
 
-	boot_count_ul = simple_strtoul(argv[1], NULL, 10) + 1;
-	reset_flag_ul= simple_strtoul(argv[2], NULL, 10);
+	if (genepi_read_pflatch()){
+		boot_count = simple_strtoul(argv[1], NULL, 10);
+		while (read_pflatch_count < 3 && genepi_read_pflatch()) {
+			if (genepi_clear_pflatch() < 0) {
+				printf("error while clearing the pflatch\n");
+				return -1;
+			}
 
-	boot_data.boot_count = boot_count_ul > 255 ? 0 : (u8)boot_count_ul;
-	boot_data.reset_flag = reset_flag_ul > 255 ? 255 : (u8)reset_flag_ul;
+			read_pflatch_count++;
+		}
+	} else {
+		boot_count = simple_strtoul(argv[1], NULL, 10) + 1;
+	}
+
+	reset_flag= simple_strtoul(argv[2], NULL, 10);
+
+	boot_data.boot_count = boot_count > 255 ? 0 : (u8)boot_count;
+	boot_data.reset_flag = reset_flag > 255 ? 255 : (u8)reset_flag;
 
 	rc = write_nand_boot_data(&boot_data);
 	if (rc < 0) {
