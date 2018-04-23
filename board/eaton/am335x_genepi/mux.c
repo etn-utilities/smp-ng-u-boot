@@ -190,6 +190,16 @@ static struct module_pin_mux bone_norcape_pin_mux[] = {
 	{-1},
 };
 #endif
+static struct module_pin_mux delay_reset_pin_mux[] = {
+	{OFFSET(gpmc_ad9), (MODE(7) | PULLUDDIS)}, /* DELAY_RESET */
+	{-1},
+};
+
+static struct module_pin_mux pf_latch_pin_mux[] = {
+	{OFFSET(lcd_vsync), (MODE(7) | PULLUDDIS)},				/* GPIO2_22 */
+	{OFFSET(gpmc_ad10), (MODE(7) | PULLUDDIS | RXACTIVE)},	/* PF-Latch GPIO */
+	{-1},
+};
 
 #if defined(CONFIG_NOR_BOOT)
 void enable_norboot_pin_mux(void)
@@ -272,5 +282,8 @@ void enable_board_pin_mux()
 
 	// gpio phy interrupt
 	configure_module_pin_mux(gpio_phy_it_mux);
+
+	configure_module_pin_mux(delay_reset_pin_mux);
+	configure_module_pin_mux(pf_latch_pin_mux);
 }
 
