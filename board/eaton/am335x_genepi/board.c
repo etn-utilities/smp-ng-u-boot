@@ -207,6 +207,19 @@ void genepi_mcu_board_init(unsigned short mpuSpeed)
   do_setup_dpll(&dpll_mpu_regs, &dpll_mpu_opp100);
 }
 
+static void genepi_set_delay_reset_low()
+{
+	int ret;
+	unsigned int gpio0_23 = GPIO_TO_PIN(0,23);
+
+	ret = gpio_request(gpio0_23, "gpmc_ad9");
+
+	if (ret)
+		printf("genepi_set_delay_reset_low: requesting pin %u (GPIO0_23) failed\n", gpio0_23);
+
+	gpio_direction_output(gpio0_23, 0);
+}
+
 /*
  * Basic board specific setup.  Pinmux has been handled already.
  */
@@ -221,6 +234,8 @@ int board_init(void)
 #if defined(CONFIG_NOR) || defined(CONFIG_NAND)
   gpmc_init();
 #endif
+
+	genepi_set_delay_reset_low();
 /*
 	usb_threshold_mngt();
   */  
