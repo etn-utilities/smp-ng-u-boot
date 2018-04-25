@@ -29,6 +29,7 @@
 #define CONFIG_SYS_DEVICE_NULLDEV
 #define CONFIG_BOARD_EARLY_INIT_F 1
 
+/* Watchdog */
 #define CONFIG_HW_WATCHDOG
 #define CONFIG_OMAP_WATCHDOG
 
@@ -79,10 +80,6 @@
 #define MTDIDS_DEFAULT			"nand0=s34ml02g2"
 #define MTDPARTS_DEFAULT		"mtdparts=s34ml02g2:"\
 	"128k(private-store)," \
-	"5120k(kernel-ses)," \
-	"5120k(kernel-sep)," \
-	"128k(dtb-ses)," \
-	"128k(dtb-sep)," \
 	"131072k(system)," \
 	"-(data)"
 /*
@@ -171,6 +168,8 @@
 	"nandrootfstype=ext4\0 " \
 	"nandargs=setenv bootargs console=${console}" \
 		"${optargs} " \
+		"ubi.mtd=1 " \
+		"ubi.mtd=2 " \
 		"root=${nandroot} " \
 		"rootfstype=${nandrootfstype} " \
 		"image_type=SEP\0" \
@@ -199,13 +198,18 @@
 	"testzimage=if itest.l *${zimage_magic_number_addr} == ${kernelmagicnumber};" \
 			"then setenv kernelimagevalid 1; " \
 		"fi;\0" \
-	"nandboot=run selectboot; " \
+	"ubifs=  ubi part system; " \
+			"ubifsmount ubi0:system; " \
+		"\0" \
+	"nandboot= " \
+		"run ubifs; " \
+		"run selectboot; " \
 		"if itest.b ${bootchoice} == 1; then " \
-			"nand read.i $loadaddr kernel-ses; " \
-			"nand read.i $fdtaddr dtb-ses;" \
+			"ubifsload $loadaddr /boot/ses/zImage-initramfs-io2200.bin; " \
+			"ubifsload $fdtaddr  /boot/ses/zImage-am335x-io2200.dtb; " \
 		"else " \
-			"nand read.i $loadaddr kernel-sep; " \
-			"nand read.i $fdtaddr dtb-sep;" \
+			"ubifsload $loadaddr /boot/sep/zImage-initramfs-io2200.bin; " \
+			"ubifsload $fdtaddr  /boot/sep/zImage-am335x-io2200.dtb; " \
 		"fi; " \
 		"run testzimage; " \
 		"if itest.b ${kernelimagevalid} == 1; then " \
@@ -252,6 +256,19 @@
 #endif
 
 #ifdef CONFIG_NAND
+
+// UBI
+#define CONFIG_CMD_UBI
+#define CONFIG_CMD_UBIFS
+#define CONFIG_RBTREE
+#define CONFIG_MTD_DEVICE
+#define CONFIG_MTD_PARTITIONS
+#define CONFIG_CMD_MTDPARTS
+#define CONFIG_LZO
+#define CONFIG_MTD_UBI_WL_THRESHOLD 4096	/* From kernel config */
+#define CONFIG_MTD_UBI_BEB_LIMIT 20			/* From kernel config */
+
+
 /* NAND: device related configs */
 #define CONFIG_SYS_NAND_5_ADDR_CYCLE
 #define CONFIG_SYS_NAND_PAGE_COUNT	(CONFIG_SYS_NAND_BLOCK_SIZE / \
