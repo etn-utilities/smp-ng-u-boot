@@ -14,8 +14,6 @@
 
 #define HDR_NAME_LEN		8
 
-#define GPIO_TO_PIN(bank, gpio) (32 * (bank) + (gpio))
-
 /*DDR3 timing definition*/
 /* IS43TR16640B15GBLI 400 MHz*/
 /*based on -15H memory speed grade as recommended by TI*/

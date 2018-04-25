@@ -46,9 +46,9 @@
 #include <linux/delay.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
-
 #define GPIO_TO_PIN(bank, gpio) (32 * (bank) + (gpio))
+
+#ifndef CONFIG_SKIP_LOWLEVEL_INIT
 
 /*  Genepi DDR 400 MHz Configuration */
 
@@ -212,7 +212,7 @@ void genepi_mcu_board_init(unsigned short mpuSpeed)
   do_setup_dpll(&dpll_mpu_regs, &dpll_mpu_opp100);
 }
 
-static void genepi_set_delay_reset_low()
+static void genepi_set_delay_reset_low(void)
 {
 	int ret;
 	unsigned int gpio0_23 = GPIO_TO_PIN(0,23);
@@ -223,51 +223,6 @@ static void genepi_set_delay_reset_low()
 		printf("genepi_set_delay_reset_low: requesting pin %u (GPIO0_23) failed\n", gpio0_23);
 
 	gpio_direction_output(gpio0_23, 0);
-}
-
-/**
- *  Returns 1 if GPIO0_26 value is 1 (high), return 0 otherwise
- **/
-static int genepi_read_pflatch(void)
-{
-	int ret, value;
-	unsigned int gpio0_26 = GPIO_TO_PIN(0,26);
-
-	ret = gpio_request(gpio0_26, "gpmc_ad10");
-	if (ret && ret != -EBUSY) {
-		printf("genepi_read_pflatch: requesting pin %u (GPIO0_26) failed\n", gpio0_26);
-		return 0;
-	}
-
-	gpio_direction_input(gpio0_26);
-	value = gpio_get_value(gpio0_26);
-
-	gpio_free(gpio0_26);
-
-	return value;
-}
-
-/**
- *  Returns 0 on success, otherwise -1
- * */
-static int genepi_clear_pflatch()
-{
-	int ret;
-	unsigned int gpio2_22 = GPIO_TO_PIN(2,22);
-
-	ret = gpio_request(gpio2_22, "lcd_vsync");
-	if (ret && ret != -EBUSY) {
-		printf("genepi_clear_pflatch: requesting pin %u (GPIO2_22) failed\n", gpio2_22);
-		return -1;
-	}
-
-	gpio_direction_output(gpio2_22, 1);
-	mdelay(5);
-
-	gpio_set_value(gpio2_22, 0);
-	gpio_free(gpio2_22);
-
-	return 0;
 }
 
 /*
@@ -296,7 +251,6 @@ int save_boot_source(void)
 {
 	u32 boot_params = *((u32 *)(SRAM_SCRATCH_SPACE_ADDR + 0x24));
 	struct omap_boot_parameters *omap_boot_params;
-	int sys_boot_device = 0;
 	u32 boot_device;
 	if ((boot_params < NON_SECURE_SRAM_START) ||
 	    (boot_params > NON_SECURE_SRAM_END))
@@ -584,6 +538,51 @@ int board_eth_init(bd_t *bis)
 	return n;
 }	 
 
+/**
+ *  Returns 1 if GPIO0_26 value is 1 (high), return 0 otherwise
+ **/
+static int genepi_read_pflatch(void)
+{
+	int ret, value;
+	unsigned int gpio0_26 = GPIO_TO_PIN(0,26);
+
+	ret = gpio_request(gpio0_26, "gpmc_ad10");
+	if (ret && ret != -EBUSY) {
+		printf("genepi_read_pflatch: requesting pin %u (GPIO0_26) failed\n", gpio0_26);
+		return 0;
+	}
+
+	gpio_direction_input(gpio0_26);
+	value = gpio_get_value(gpio0_26);
+
+	gpio_free(gpio0_26);
+
+	return value;
+}
+
+/**
+ *  Returns 0 on success, otherwise -1
+ * */
+static int genepi_clear_pflatch(void)
+{
+	int ret;
+	unsigned int gpio2_22 = GPIO_TO_PIN(2,22);
+
+	ret = gpio_request(gpio2_22, "lcd_vsync");
+	if (ret && ret != -EBUSY) {
+		printf("genepi_clear_pflatch: requesting pin %u (GPIO2_22) failed\n", gpio2_22);
+		return -1;
+	}
+
+	gpio_direction_output(gpio2_22, 1);
+	mdelay(5);
+
+	gpio_set_value(gpio2_22, 0);
+	gpio_free(gpio2_22);
+
+	return 0;
+}
+
 int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct eaton_boot_data_struct boot_data;
@@ -624,11 +623,11 @@ int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return rc;
 }
 
-int board_early_init_f(void) {
+int board_early_init_f(void)
+{
 	gd->flags |= (GD_FLG_SILENT | GD_FLG_DISABLE_CONSOLE);
 
 	return 0;
-
 }
 
 U_BOOT_CMD(save_boot_data, 3, 0, do_save_boot_data,
