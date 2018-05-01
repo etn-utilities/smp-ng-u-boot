@@ -230,6 +230,9 @@ static void genepi_set_delay_reset_low(void)
  */
 int board_init(void)
 {
+        // Write PRM_RSTTIME register to set reset duration to maximum (in number of clock cycles)
+        writel(0x00001fff, PRM_RSTTIME);
+
 #if defined(CONFIG_HW_WATCHDOG)
 	hw_watchdog_init();
 	printf("Watchdog Hardware: enabled\n");
