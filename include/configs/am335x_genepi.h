@@ -151,28 +151,24 @@
 	"mmcdev=0\0" \
 	"mmcroot=/dev/mmcblk0p2 ro\0" \
 	"mmcrootfstype=ext4\0" \
-	"rootpath=/export/rootfs\0" \
 	"nfsopts=nolock\0" \
 	"bootcounter=0\0" \
 	"bootcounterlimit=3\0" \
-	"bootchoice=0\0" \
+	"image_type=sep\0" \
 	"kernelmagicnumber=0x16f2818\0" \
 	"kernelimagevalid=0\0" \
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"root=${mmcroot} " \
 		"rootfstype=${mmcrootfstype} " \
-		"image_type=SEP " \
-		"factory_reset=${factory_reset}\0" \
-	"nandroot=/dev/mtdblock6\0 " \
-	"nandrootfstype=ext4\0 " \
+		"image_type=${image_type} " \
+		"\0" \
 	"nandargs=setenv bootargs console=${console}" \
 		"${optargs} " \
 		"ubi.mtd=1 " \
 		"ubi.mtd=2 " \
-		"root=${nandroot} " \
-		"rootfstype=${nandrootfstype} " \
-		"image_type=SEP\0" \
+		"image_type=${image_type} " \
+		"\0" \
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
 	"loadfdt=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${fdtfile}\0" \
 	"mmcloados=run mmcargs; " \
@@ -189,33 +185,33 @@
 		"else " \
 			"bootz; " \
 		"fi;\0" \
-	"selectboot=if test ${bootcounter} > ${bootcounterlimit}; then " \
-			"setenv bootchoice 0; " \
-		"else " \
-			"setenv bootchoice 0; " \
- 		"fi; " \
-		"save_boot_data ${bootcounter} ${resetflag}\0" \
 	"testzimage=if itest.l *${zimage_magic_number_addr} == ${kernelmagicnumber};" \
 			"then setenv kernelimagevalid 1; " \
 		"fi;\0" \
 	"ubifs=  ubi part system; " \
 			"ubifsmount ubi0:system; " \
 		"\0" \
-	"nandboot= " \
-		"run ubifs; " \
-		"run selectboot; " \
-		"if itest.b ${bootchoice} == 1; then " \
-			"ubifsload $loadaddr /boot/ses/zImage-initramfs-io2200.bin; " \
-			"ubifsload $fdtaddr  /boot/ses/zImage-am335x-io2200.dtb; " \
-		"else " \
-			"ubifsload $loadaddr /boot/sep/zImage-initramfs-io2200.bin; " \
-			"ubifsload $fdtaddr  /boot/sep/zImage-am335x-io2200.dtb; " \
-		"fi; " \
+	"nandboot2= " \
+		"ubifsload $loadaddr /boot/${image_type}/zImage-initramfs-io2200.bin; " \
+		"ubifsload $fdtaddr  /boot/${image_type}/zImage-am335x-io2200.dtb; " \
 		"run testzimage; " \
 		"if itest.b ${kernelimagevalid} == 1; then " \
 			"run nandargs; " \
 			"bootz $loadaddr - ${fdtaddr}; " \
-		"fi; \0" \
+		"else " \
+			"echo ERROR: The ${image_type} Kernel is invalid;" \
+		"fi; " \
+		"\0" \
+	"nandboot= " \
+		"save_boot_data ${bootcounter} ${resetflag}; " \
+		"run ubifs; " \
+		"if test ${bootcounter} -lt ${bootcounterlimit}; then " \
+			"setenv image_type sep; " \
+			"run nandboot2; " \
+		"fi; " \
+		"setenv image_type ses; " \
+		"run nandboot2; " \
+		"\0" \
 	"mmcboot= mmc dev ${mmcdev}; " \
 			"if mmc rescan; then " \
 				"echo SD/MMC found on device ${mmcdev};" \
