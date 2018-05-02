@@ -83,9 +83,8 @@
 	"5120k(kernel-sep)," \
 	"128k(dtb-ses)," \
 	"128k(dtb-sep)," \
-	"1024k(prod)," \
-	"131072k(boot)," \
-	"-(rootfs)"
+	"131072k(system)," \
+	"-(data)"
 /*
  * We setup defaults based on constraints from the Linux kernel, which should
  * also be safe elsewhere.  We have the default load at 32MB into DDR (for
