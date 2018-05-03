@@ -144,7 +144,7 @@
 	"boot_fdt=try\0" \
 	"bootpart=0:2\0" \
 	"bootdir=/boot\0" \
-	"bootfile=zImage\0" \
+	"bootfile=fitImage\0" \
 	"fdtfile=am335x-io2200.dtb\0" \
 	"console=ttyS4,115200n8 earlyprintk\0" \
 	"optargs=\0" \
@@ -155,8 +155,6 @@
 	"bootcounter=0\0" \
 	"bootcounterlimit=3\0" \
 	"boot_type=sep\0" \
-	"kernelmagicnumber=0x16f2818\0" \
-	"kernelimagevalid=0\0" \
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"root=${mmcroot} " \
@@ -170,37 +168,17 @@
 		"boot_type=${boot_type} " \
 		"\0" \
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
-	"loadfdt=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${fdtfile}\0" \
 	"mmcloados=run mmcargs; " \
 		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
-			"if run loadfdt; then " \
-				"bootz ${loadaddr} - ${fdtaddr}; " \
-			"else " \
-				"if test ${boot_fdt} = try; then " \
-					"bootz; " \
-				"else " \
-					"echo WARN: Cannot load the DT; " \
-				"fi; " \
-			"fi; " \
-		"else " \
-			"bootz; " \
-		"fi;\0" \
-	"testzimage=if itest.l *${zimage_magic_number_addr} == ${kernelmagicnumber};" \
-			"then setenv kernelimagevalid 1; " \
+			"bootm ${loadaddr};" \
 		"fi;\0" \
 	"ubifs=  ubi part system; " \
 			"ubifsmount ubi0:system; " \
 		"\0" \
 	"nandboot2= " \
-		"ubifsload $loadaddr /boot/${boot_type}/zImage-initramfs-io2200.bin; " \
-		"ubifsload $fdtaddr  /boot/${boot_type}/zImage-am335x-io2200.dtb; " \
-		"run testzimage; " \
-		"if itest.b ${kernelimagevalid} == 1; then " \
-			"run nandargs; " \
-			"bootz $loadaddr - ${fdtaddr}; " \
-		"else " \
-			"echo ERROR: The ${boot_type} Kernel is invalid;" \
-		"fi; " \
+		"ubifsload $loadaddr /boot/${boot_type}/${bootfile}; " \
+		"run nandargs; " \
+		"bootm $loadaddr; " \
 		"\0" \
 	"nandboot= " \
 		"save_boot_data ${bootcounter} ${resetflag}; " \
@@ -217,6 +195,8 @@
 				"echo SD/MMC found on device ${mmcdev};" \
 				"if run loadimage; then " \
 					"run mmcloados;" \
+				"else " \
+					"echo failed to load fitImage;" \
 				"fi;" \
 			"fi ;" \
 		"fi;\0"
