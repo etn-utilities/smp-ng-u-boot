@@ -154,20 +154,20 @@
 	"nfsopts=nolock\0" \
 	"bootcounter=0\0" \
 	"bootcounterlimit=3\0" \
-	"image_type=sep\0" \
+	"boot_type=sep\0" \
 	"kernelmagicnumber=0x16f2818\0" \
 	"kernelimagevalid=0\0" \
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"root=${mmcroot} " \
 		"rootfstype=${mmcrootfstype} " \
-		"image_type=${image_type} " \
+		"boot_type=${boot_type} " \
 		"\0" \
 	"nandargs=setenv bootargs console=${console}" \
 		"${optargs} " \
 		"ubi.mtd=1 " \
 		"ubi.mtd=2 " \
-		"image_type=${image_type} " \
+		"boot_type=${boot_type} " \
 		"\0" \
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
 	"loadfdt=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${fdtfile}\0" \
@@ -192,24 +192,24 @@
 			"ubifsmount ubi0:system; " \
 		"\0" \
 	"nandboot2= " \
-		"ubifsload $loadaddr /boot/${image_type}/zImage-initramfs-io2200.bin; " \
-		"ubifsload $fdtaddr  /boot/${image_type}/zImage-am335x-io2200.dtb; " \
+		"ubifsload $loadaddr /boot/${boot_type}/zImage-initramfs-io2200.bin; " \
+		"ubifsload $fdtaddr  /boot/${boot_type}/zImage-am335x-io2200.dtb; " \
 		"run testzimage; " \
 		"if itest.b ${kernelimagevalid} == 1; then " \
 			"run nandargs; " \
 			"bootz $loadaddr - ${fdtaddr}; " \
 		"else " \
-			"echo ERROR: The ${image_type} Kernel is invalid;" \
+			"echo ERROR: The ${boot_type} Kernel is invalid;" \
 		"fi; " \
 		"\0" \
 	"nandboot= " \
 		"save_boot_data ${bootcounter} ${resetflag}; " \
 		"run ubifs; " \
 		"if test ${bootcounter} -lt ${bootcounterlimit}; then " \
-			"setenv image_type sep; " \
+			"setenv boot_type sep; " \
 			"run nandboot2; " \
 		"fi; " \
-		"setenv image_type ses; " \
+		"setenv boot_type ses; " \
 		"run nandboot2; " \
 		"\0" \
 	"mmcboot= mmc dev ${mmcdev}; " \
