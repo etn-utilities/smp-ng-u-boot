@@ -1,0 +1,22 @@
+&ldo3_reg {
+	regulator-min-microvolt = <1800000>;
+	regulator-max-microvolt = <1800000>;
+	regulator-always-on;
+};
+
+&mmc1 {
+	compatible = "ti,am33xx-hsmmc";
+	vmmc-supply = <&vmmcsd_fixed>;
+};
+
+&mmc2 {
+	compatible = "ti,am33xx-hsmmc";
+	vmmc-supply = <&vmmcsd_fixed>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&emmc_pins>;
+	bus-width = <8>;
+	status = "okay";
+};
+&rtc {
+	system-power-controller;
+};
