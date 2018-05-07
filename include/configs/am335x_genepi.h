@@ -147,7 +147,7 @@
 	"bootfile=zImage\0" \
 	"fdtfile=am335x-io2200.dtb\0" \
 	"console=ttyS4,115200n8 earlyprintk\0" \
-	"optargs=\0" \
+	"optargs=panic=10\0" \
 	"mmcdev=0\0" \
 	"mmcroot=/dev/mmcblk0p2 ro\0" \
 	"mmcrootfstype=ext4\0" \
@@ -163,7 +163,7 @@
 		"rootfstype=${mmcrootfstype} " \
 		"boot_type=${boot_type} " \
 		"\0" \
-	"nandargs=setenv bootargs console=${console}" \
+	"nandargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"ubi.mtd=1 " \
 		"ubi.mtd=2 " \
