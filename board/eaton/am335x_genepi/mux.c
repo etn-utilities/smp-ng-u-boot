@@ -207,6 +207,11 @@ static struct module_pin_mux pf_latch_pin_mux[] = {
 	{-1},
 };
 
+static struct module_pin_mux front_push_button_mux[] = {
+	{OFFSET(gpmc_ad11), (MODE(7) | PULLUDDIS | RXACTIVE)},				/* GPIO0_27 */
+	{-1},
+};
+
 #if defined(CONFIG_NOR_BOOT)
 void enable_norboot_pin_mux(void)
 {
@@ -296,6 +301,7 @@ void enable_board_pin_mux()
 
 	configure_module_pin_mux(delay_reset_pin_mux);
 	configure_module_pin_mux(pf_latch_pin_mux);
+	configure_module_pin_mux(front_push_button_mux);
 
 	enable_ethernet_hard_reset_pin_mux();
 }
