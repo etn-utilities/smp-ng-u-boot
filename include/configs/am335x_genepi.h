@@ -176,9 +176,10 @@
 			"ubifsmount ubi0:system; " \
 		"\0" \
 	"nandboot2= " \
-		"ubifsload $loadaddr /boot/${boot_type}/${bootfile}; " \
-		"run nandargs; " \
-		"bootm $loadaddr; " \
+		"if ubifsload $loadaddr /boot/${boot_type}/fitImage-initramfs-io2200-io2200.bin; then " \
+			"run nandargs; " \
+			"bootm $loadaddr; " \
+		"fi; " \
 		"\0" \
 	"nandboot= " \
 		"save_boot_data ${bootcounter} ${resetflag}; " \
