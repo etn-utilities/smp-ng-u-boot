@@ -186,11 +186,20 @@
 		"run ubifs; " \
 		"if test ${bootcounter} -lt ${bootcounterlimit}; then " \
 			"setenv boot_type sep; " \
-			"run nandboot2; " \
+		"else " \
+			"setenv boot_type ses; " \			
 		"fi; " \
+		"if test ${force_toggle_boot} = 1; then " \
+			"if test ${boot_type} = ses; then " \
+				"setenv boot_type sep; " \
+			"else " \
+				"setenv boot_type ses; " \
+			"fi; " \
+		"fi; " \
+		"run nandboot2; " \
 		"setenv boot_type ses; " \
 		"run nandboot2; " \
-		"\0" \
+		"\0" \		
 	"mmcboot= mmc dev ${mmcdev}; " \
 			"if mmc rescan; then " \
 				"echo SD/MMC found on device ${mmcdev};" \

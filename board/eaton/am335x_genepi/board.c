@@ -46,8 +46,9 @@
 #include <linux/delay.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+static u32 boot_device;
 #define GPIO_TO_PIN(bank, gpio) (32 * (bank) + (gpio))
-
+#define FORCE_TOGGLE_BOOT_DELAY 5000
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
 
 /*  Genepi DDR 400 MHz Configuration */
@@ -225,6 +226,28 @@ static void genepi_set_delay_reset_low(void)
 	gpio_direction_output(gpio0_23, 0);
 }
 
+/**
+ *  Returns 1 if GPIO0_26 value is 1 (high), returns 0 otherwise
+ **/
+static int genepi_read_front_button(void)
+{
+	int ret, value;
+	unsigned int gpio0_27 = GPIO_TO_PIN(0,27);
+
+	ret = gpio_request(gpio0_27, "gpmc_ad11");
+	if (ret && ret != -EBUSY) {
+		printf("genepi_read_front_button: requesting pin %u (GPIO0_27) failed\n", gpio0_27);
+		return 0;
+	}
+
+	gpio_direction_input(gpio0_27);
+	value = gpio_get_value(gpio0_27);
+
+	gpio_free(gpio0_27);
+
+	return value;
+}
+
 /*
  * Basic board specific setup.  Pinmux has been handled already.
  */
@@ -254,7 +277,7 @@ int save_boot_source(void)
 {
 	u32 boot_params = *((u32 *)(SRAM_SCRATCH_SPACE_ADDR + 0x24));
 	struct omap_boot_parameters *omap_boot_params;
-	u32 boot_device;
+
 	if ((boot_params < NON_SECURE_SRAM_START) ||
 	    (boot_params > NON_SECURE_SRAM_END))
 		return;
@@ -363,6 +386,8 @@ int board_late_init(void)
 	struct eaton_boot_data_struct boot_data;
 	char boot_count_str[5];
 	char reset_flag_str[5];
+	u32 timer_start;
+	int front_button_value = 1;
 	int rc = 0;
 
 	/* Now set variables based on the header. */
@@ -384,6 +409,21 @@ int board_late_init(void)
 		setenv("bootcounter", boot_count_str);
 		setenv("resetflag", reset_flag_str);
 	}
+
+	if (boot_device == BOOT_DEVICE_SPI ) {
+		timer_start = get_timer(0);
+		while (get_timer(timer_start) < FORCE_TOGGLE_BOOT_DELAY) {
+			/*
+			 * The GPIO is active low and we want to stop looping as soon as it is
+			 * activated.
+			 */
+			front_button_value = genepi_read_front_button();
+			if(front_button_value == 0)
+				break;
+		}
+	}
+
+	setenv("force_toggle_boot", front_button_value == 1 ? "0" : "1");
 
 	return 0;
 }
