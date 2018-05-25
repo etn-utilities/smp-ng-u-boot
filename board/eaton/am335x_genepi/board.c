@@ -429,48 +429,6 @@ int board_late_init(void)
 }
 #endif
 
-#if (defined(CONFIG_DRIVER_TI_CPSW) && !defined(CONFIG_SPL_BUILD)) || \
-	(defined(CONFIG_SPL_ETH_SUPPORT) && defined(CONFIG_SPL_BUILD))
-static void cpsw_control(int enabled)
-{
-	/* VTP can be added here */
-
-	return;
-}
-
-static struct cpsw_slave_data cpsw_slaves[] = {
-	{
-		.slave_reg_ofs	= 0x208,
-		.sliver_reg_ofs	= 0xd80,
-		.phy_addr	= 0,
-	},
-	{
-		.slave_reg_ofs	= 0x308,
-		.sliver_reg_ofs	= 0xdc0,
-		.phy_addr	= 1,
-	},
-};
-
-static struct cpsw_platform_data cpsw_data = {
-	.mdio_base		= CPSW_MDIO_BASE,
-	.cpsw_base		= CPSW_BASE,
-	.mdio_div		= 0xff,
-	.channels		= 8,
-	.cpdma_reg_ofs		= 0x800,
-	.slaves			= 1,
-	.slave_data		= cpsw_slaves,
-	.ale_reg_ofs		= 0xd00,
-	.ale_entries		= 1024,
-	.host_port_reg_ofs	= 0x108,
-	.hw_stats_reg_ofs	= 0x900,
-	.bd_ram_ofs		= 0x2000,
-	.mac_control		= (1 << 5),
-	.control		= cpsw_control,
-	.host_port_num		= 0,
-	.version		= CPSW_CTRL_VERSION_2,
-};
-#endif
-
 /*
  * This function will:
  * Read the eFuse for MAC addresses, and set ethaddr/eth1addr/usbnet_devaddr
@@ -535,36 +493,6 @@ int board_eth_init(bd_t *bis)
 		printf("<ethaddr> not set. Validating first E-fuse MAC\n");
 		eth_setenv_enetaddr("ethaddr", mac_addr);
 	}
-
-#ifdef CONFIG_DRIVER_TI_CPSW
-
-	mac_lo = readl(&cdev->macid1l);
-	mac_hi = readl(&cdev->macid1h);
-	mac_addr[0] = mac_hi & 0xFF;
-	mac_addr[1] = (mac_hi & 0xFF00) >> 8;
-	mac_addr[2] = (mac_hi & 0xFF0000) >> 16;
-	mac_addr[3] = (mac_hi & 0xFF000000) >> 24;
-	mac_addr[4] = mac_lo & 0xFF;
-	mac_addr[5] = (mac_lo & 0xFF00) >> 8;
-
-	if (!getenv("eth1addr")) {
-		eth_setenv_enetaddr("eth1addr", mac_addr);
-	}
-
-	/*if (read_eeprom(&header) < 0)
-		puts("Could not get board ID.\n");*/
-
-	// Keep Starter Kit Config (RGMI) evm
-	writel((RGMII_MODE_ENABLE | RGMII_INT_DELAY), &cdev->miisel);
-	cpsw_slaves[0].phy_if = cpsw_slaves[1].phy_if = PHY_INTERFACE_MODE_RGMII;
-
-	rv = cpsw_register(&cpsw_data);
-	if (rv < 0)
-		printf("Error %d registering CPSW switch\n", rv);
-	else
-		n += rv;
-#endif
-
 	
 #endif
 #if defined(CONFIG_USB_ETHER) && \
