@@ -280,7 +280,7 @@ int save_boot_source(void)
 
 	if ((boot_params < NON_SECURE_SRAM_START) ||
 	    (boot_params > NON_SECURE_SRAM_END))
-		return;
+		return 1;
 
 	omap_boot_params = (struct omap_boot_parameters *)boot_params;
 
@@ -473,7 +473,7 @@ static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
 
 int board_eth_init(bd_t *bis)
 {
-	int rv, n = 0;
+	int n = 0;
 	uint8_t mac_addr[6];
 	uint32_t mac_hi, mac_lo;
 
@@ -546,7 +546,7 @@ static int genepi_clear_pflatch(void)
 	}
 
 	gpio_direction_output(gpio2_22, 1);
-	mdelay(5);
+	mdelay(100);
 
 	gpio_set_value(gpio2_22, 0);
 	gpio_free(gpio2_22);
