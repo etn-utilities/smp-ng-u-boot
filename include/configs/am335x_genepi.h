@@ -33,6 +33,13 @@
 #define CONFIG_HW_WATCHDOG
 #define CONFIG_OMAP_WATCHDOG
 
+/* Signature */
+#ifdef VALIDATE_SIGNATURE
+#define VALIDATE_SIGNATURE_KERNEL_ARG ""
+#else
+#define VALIDATE_SIGNATURE_KERNEL_ARG "signed=no "
+#endif		
+
 /* Main PLL Fdll = 300 MHz on Genepi */
 #define CONFIG_SYS_MPUCLK	MPUPLL_M_300
 
@@ -166,6 +173,7 @@
 		"ubi.mtd=1 " \
 		"ubi.mtd=2 " \
 		"boot_type=${boot_type} " \
+		VALIDATE_SIGNATURE_KERNEL_ARG \
 		"\0" \
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
 	"mmcloados=run mmcargs; " \
