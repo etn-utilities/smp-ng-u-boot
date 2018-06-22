@@ -400,6 +400,7 @@ int board_late_init(void)
 
 	/* Reading boot cause from PRM_RSTST register */
 	boot_cause = readl(PRM_RSTST);
+	writel(boot_cause, PRM_RSTST);
 	sprintf(boot_cause_str, "%08x", boot_cause);
 	setenv("boot_cause", boot_cause_str);
 
