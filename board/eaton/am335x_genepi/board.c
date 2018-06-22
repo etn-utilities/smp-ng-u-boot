@@ -253,8 +253,8 @@ static int genepi_read_front_button(void)
  */
 int board_init(void)
 {
-        // Write PRM_RSTTIME register to set reset duration to maximum (in number of clock cycles)
-        writel(0x00001fff, PRM_RSTTIME);
+	// Write PRM_RSTTIME register to set reset duration to maximum (in number of clock cycles)
+	writel(0x00001fff, PRM_RSTTIME);
 
 #if defined(CONFIG_HW_WATCHDOG)
 	hw_watchdog_init();
@@ -389,12 +389,20 @@ int board_late_init(void)
 	u32 timer_start;
 	int front_button_value = 1;
 	int rc = 0;
+	u32 boot_cause;
+	char boot_cause_str[10];
 
 	/* Now set variables based on the header. */
 	strncpy(safe_string, BOARD_NAME, sizeof(BOARD_NAME));
 	safe_string[sizeof(BOARD_NAME)] = 0;
 	setenv("board_name", safe_string);
 	setenv("bootdelay", "2");
+
+	/* Reading boot cause from PRM_RSTST register */
+	boot_cause = readl(PRM_RSTST);
+	sprintf(boot_cause_str, "%08x", boot_cause);
+	setenv("boot_cause", boot_cause_str);
+
 	save_boot_source();
 
 	rc = read_nand_boot_data(&boot_data);
@@ -404,7 +412,6 @@ int board_late_init(void)
 	} else {
 		sprintf(boot_count_str, "%d", 255 - boot_data.boot_count);
 		sprintf(reset_flag_str, "%d", boot_data.reset_flag);
-		printf("data: %s, %s\n", boot_count_str, reset_flag_str);
 
 		setenv("bootcounter", boot_count_str);
 		setenv("resetflag", reset_flag_str);
@@ -567,6 +574,7 @@ int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	}
 
 	if (genepi_read_pflatch()){
+		setenv("power_fail", "1");
 		boot_count = simple_strtoul(argv[1], NULL, 10);
 		while (read_pflatch_count < 3 && genepi_read_pflatch()) {
 			if (genepi_clear_pflatch() < 0) {
