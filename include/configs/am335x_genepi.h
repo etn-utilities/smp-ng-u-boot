@@ -162,6 +162,7 @@
 	"bootcounter=0\0" \
 	"bootcounterlimit=3\0" \
 	"boot_type=sep\0" \
+	"power_fail=0\0" \
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"root=${mmcroot} " \
@@ -173,6 +174,8 @@
 		"ubi.mtd=1 " \
 		"ubi.mtd=2 " \
 		"boot_type=${boot_type} " \
+		"boot_cause=${boot_cause} " \
+		"power_fail=${power_fail} "\
 		VALIDATE_SIGNATURE_KERNEL_ARG \
 		"\0" \
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
