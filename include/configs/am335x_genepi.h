@@ -171,8 +171,6 @@
 		"\0" \
 	"nandargs=setenv bootargs console=${console} " \
 		"${optargs} " \
-		"ubi.mtd=1 " \
-		"ubi.mtd=2 " \
 		"boot_type=${boot_type} " \
 		"boot_cause=${boot_cause} " \
 		"power_fail=${power_fail} "\
