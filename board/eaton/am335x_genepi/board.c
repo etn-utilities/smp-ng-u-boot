@@ -396,7 +396,12 @@ int board_late_init(void)
 	strncpy(safe_string, BOARD_NAME, sizeof(BOARD_NAME));
 	safe_string[sizeof(BOARD_NAME)] = 0;
 	setenv("board_name", safe_string);
+	
+#ifdef CONFIG_DISABLE_PROMPT
+	setenv("bootdelay", "0");
+#else
 	setenv("bootdelay", "2");
+#endif
 
 	/* Reading boot cause from PRM_RSTST register */
 	boot_cause = readl(PRM_RSTST);
@@ -605,8 +610,6 @@ int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 int board_early_init_f(void)
 {
-	gd->flags |= (GD_FLG_SILENT | GD_FLG_DISABLE_CONSOLE);
-
 	return 0;
 }
 

@@ -383,6 +383,10 @@ int fprintf(int file, const char *fmt, ...)
 
 int getc(void)
 {
+#ifdef CONFIG_DISABLE_PROMPT
+	return 0;
+#endif	
+
 #ifdef CONFIG_DISABLE_CONSOLE
 	if (gd->flags & GD_FLG_DISABLE_CONSOLE)
 		return 0;
@@ -411,6 +415,10 @@ int getc(void)
 
 int tstc(void)
 {
+#ifdef CONFIG_DISABLE_PROMPT
+	return 0;
+#endif	
+	
 #ifdef CONFIG_DISABLE_CONSOLE
 	if (gd->flags & GD_FLG_DISABLE_CONSOLE)
 		return 0;
