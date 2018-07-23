@@ -156,7 +156,7 @@
 	"bootfile=fitImage\0" \
 	"fdtfile=am335x-io2200.dtb\0" \
 	"console=ttyS4,115200n8 earlyprintk\0" \
-	"optargs=panic=10\0" \
+	"optargs=panic=10 nohz=off\0" \
 	"mmcdev=0\0" \
 	"mmcroot=/dev/mmcblk0p2 ro\0" \
 	"mmcrootfstype=ext4\0" \
