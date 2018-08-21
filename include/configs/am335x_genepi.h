@@ -199,16 +199,20 @@
 			"setenv boot_type sep; " \
 		"else " \
 			"setenv boot_type ses; " \
+			"echo Booting in rescue mode (counter);" \
 		"fi; " \
 		"if test ${force_toggle_boot} = 1; then " \
 			"if test ${boot_type} = ses; then " \
 				"setenv boot_type sep; " \
+				"echo Booting in primary mode (button);" \
 			"else " \
 				"setenv boot_type ses; " \
+				"echo Booting in rescue mode (button);" \
 			"fi; " \
 		"fi; " \
 		"run nandboot2; " \
 		"setenv boot_type ses; " \
+		"echo Booting in rescue mode (primary failed);" \
 		"run nandboot2; " \
 		"\0" \
 	"mmcboot= mmc dev ${mmcdev}; " \
