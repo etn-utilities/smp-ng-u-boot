@@ -48,7 +48,7 @@
 DECLARE_GLOBAL_DATA_PTR;
 static u32 boot_device;
 #define GPIO_TO_PIN(bank, gpio) (32 * (bank) + (gpio))
-#define FORCE_TOGGLE_BOOT_DELAY 5000
+#define FORCE_BOOT_RESCUE_DELAY 5000
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
 
 /*  Genepi DDR 400 MHz Configuration */
@@ -378,150 +378,6 @@ int read_nand_boot_data(struct eaton_boot_data_struct *boot_data)
 	return 0;
 }
 
-#ifdef CONFIG_BOARD_LATE_INIT
-#define BOARD_NAME "Genepi"
-int board_late_init(void)
-{
-	char safe_string[HDR_NAME_LEN + 1];
-	struct eaton_boot_data_struct boot_data;
-	char boot_count_str[5];
-	char reset_flag_str[5];
-	u32 timer_start;
-	int front_button_value = 1;
-	int rc = 0;
-	u32 boot_cause;
-	char boot_cause_str[10];
-
-	/* Now set variables based on the header. */
-	strncpy(safe_string, BOARD_NAME, sizeof(BOARD_NAME));
-	safe_string[sizeof(BOARD_NAME)] = 0;
-	setenv("board_name", safe_string);
-	
-#ifdef CONFIG_DISABLE_PROMPT
-	setenv("bootdelay", "0");
-#else
-	setenv("bootdelay", "2");
-#endif
-
-	/* Reading boot cause from PRM_RSTST register */
-	boot_cause = readl(PRM_RSTST);
-	writel(boot_cause, PRM_RSTST);
-	sprintf(boot_cause_str, "%08x", boot_cause);
-	setenv("boot_cause", boot_cause_str);
-
-	save_boot_source();
-
-	rc = read_nand_boot_data(&boot_data);
-	if (rc < 0) {
-		printf("error reading from nand boot\n");
-		return -1;
-	} else {
-		sprintf(boot_count_str, "%d", 255 - boot_data.boot_count);
-		sprintf(reset_flag_str, "%d", boot_data.reset_flag);
-
-		setenv("bootcounter", boot_count_str);
-		setenv("resetflag", reset_flag_str);
-	}
-
-	if (boot_device == BOOT_DEVICE_SPI ) {
-		timer_start = get_timer(0);
-		while (get_timer(timer_start) < FORCE_TOGGLE_BOOT_DELAY) {
-			/*
-			 * The GPIO is active low and we want to stop looping as soon as it is
-			 * activated.
-			 */
-			front_button_value = genepi_read_front_button();
-			if(front_button_value == 0)
-				break;
-		}
-	}
-
-	setenv("force_toggle_boot", front_button_value == 1 ? "0" : "1");
-
-	return 0;
-}
-#endif
-
-/*
- * This function will:
- * Read the eFuse for MAC addresses, and set ethaddr/eth1addr/usbnet_devaddr
- * in the environment
- * Perform fixups to the PHY present on certain boards.  We only need this
- * function in:
- * - SPL with either CPSW or USB ethernet support
- * - Full U-Boot, with either CPSW or USB ethernet
- * Build in only these cases to avoid warnings about unused variables
- * when we build an SPL that has neither option but full U-Boot will.
- */
-#if ((defined(CONFIG_SPL_ETH_SUPPORT) || defined(CONFIG_SPL_USBETH_SUPPORT)) \
-		&& defined(CONFIG_SPL_BUILD)) || \
-	((defined(CONFIG_DRIVER_TI_CPSW) || \
-	  defined(CONFIG_USB_ETHER) && defined(CONFIG_MUSB_GADGET)) && \
-	 !defined(CONFIG_SPL_BUILD))
-
-
-// initialize 88E1510 Marvell Phy
-int board_phy_config(struct phy_device *phydev)
-{
-  //disable CLK125 output as it is not used (EMI purpose)
-  phy_write(phydev, MDIO_DEVAD_NONE, 22, 0x0002);
-  phy_write(phydev, MDIO_DEVAD_NONE, 16, 0x444E);
-
-  //set LED configuration
-  phy_write(phydev, MDIO_DEVAD_NONE, 22, 0x0003);
-  phy_write(phydev, MDIO_DEVAD_NONE, 16, 0x1012);
-
-  //return to page 0
-  phy_write(phydev, MDIO_DEVAD_NONE, 22, 0x0000);
-
-
-  if (phydev->drv->config)
-    phydev->drv->config(phydev);
-
-  return 0;
-}
-
-
-static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
-
-int board_eth_init(bd_t *bis)
-{
-	int n = 0;
-	uint8_t mac_addr[6];
-	uint32_t mac_hi, mac_lo;
-
-	/* try reading mac address from efuse */
-	mac_lo = readl(&cdev->macid0l);
-	mac_hi = readl(&cdev->macid0h);
-	mac_addr[0] = mac_hi & 0xFF;
-	mac_addr[1] = (mac_hi & 0xFF00) >> 8;
-	mac_addr[2] = (mac_hi & 0xFF0000) >> 16;
-	mac_addr[3] = (mac_hi & 0xFF000000) >> 24;
-	mac_addr[4] = mac_lo & 0xFF;
-	mac_addr[5] = (mac_lo & 0xFF00) >> 8;
-
-#if (defined(CONFIG_DRIVER_TI_CPSW) && !defined(CONFIG_SPL_BUILD)) || \
-	(defined(CONFIG_SPL_ETH_SUPPORT) && defined(CONFIG_SPL_BUILD))
-	if (!getenv("ethaddr")) {
-		printf("<ethaddr> not set. Validating first E-fuse MAC\n");
-		eth_setenv_enetaddr("ethaddr", mac_addr);
-	}
-	
-#endif
-#if defined(CONFIG_USB_ETHER) && \
-	(!defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_USBETH_SUPPORT))
-	if (is_valid_ether_addr(mac_addr))
-		eth_setenv_enetaddr("usbnet_devaddr", mac_addr);
-
-	rv = usb_eth_initialize(bis);
-	if (rv < 0)
-		printf("Error %d registering USB_ETHER\n", rv);
-	else
-		n += rv;
-#endif
-	return n;
-}	 
-
 /**
  *  Returns 1 if GPIO0_26 value is 1 (high), return 0 otherwise
  **/
@@ -567,21 +423,54 @@ static int genepi_clear_pflatch(void)
 	return 0;
 }
 
-int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+#ifdef CONFIG_BOARD_LATE_INIT
+#define BOARD_NAME "Genepi"
+int board_late_init(void)
 {
+	char safe_string[HDR_NAME_LEN + 1];
 	struct eaton_boot_data_struct boot_data;
 	unsigned long boot_count;
-	unsigned long reset_flag;
-	int read_pflatch_count = 0;
+	char boot_count_str[5];
+	char reset_flag_str[5];
+	u32 timer_start;
+	int front_button_value = 1;
 	int rc = 0;
+	u32 boot_cause;
+	char boot_cause_str[10];
+	int read_pflatch_count = 0;
 
-	if ( argc != 3){
+	/* Now set variables based on the header. */
+	strncpy(safe_string, BOARD_NAME, sizeof(BOARD_NAME));
+	safe_string[sizeof(BOARD_NAME)] = 0;
+	setenv("board_name", safe_string);
+	
+#ifdef CONFIG_DISABLE_PROMPT
+	setenv("bootdelay", "0");
+#else
+	setenv("bootdelay", "2");
+#endif
+
+	/* Reading boot cause from PRM_RSTST register */
+	boot_cause = readl(PRM_RSTST);
+	writel(boot_cause, PRM_RSTST);
+	sprintf(boot_cause_str, "%08x", boot_cause);
+	setenv("boot_cause", boot_cause_str);
+
+	save_boot_source();
+
+	rc = read_nand_boot_data(&boot_data);
+	if (rc < 0) {
+		printf("error reading from nand boot\n");
 		return -1;
 	}
+	sprintf(reset_flag_str, "%d", boot_data.reset_flag);
+	setenv("resetflag", reset_flag_str);
 
-	if (genepi_read_pflatch()){
+	boot_count = 255 - boot_data.boot_count;
+
+	if (genepi_read_pflatch())
+	{
 		setenv("power_fail", "1");
-		boot_count = simple_strtoul(argv[1], NULL, 10);
 		while (read_pflatch_count < 3 && genepi_read_pflatch()) {
 			if (genepi_clear_pflatch() < 0) {
 				printf("error while clearing the pflatch\n");
@@ -590,10 +479,125 @@ int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 			read_pflatch_count++;
 		}
-	} else {
-		boot_count = simple_strtoul(argv[1], NULL, 10) + 1;
+	}
+	else
+	{
+		boot_count++;
 	}
 
+	sprintf(boot_count_str, "%d", boot_count);
+	setenv("bootcounter", boot_count_str);
+
+	if (boot_device == BOOT_DEVICE_SPI ) {
+		timer_start = get_timer(0);
+		while (get_timer(timer_start) < FORCE_BOOT_RESCUE_DELAY) {
+			/*
+			 * The GPIO is active low and we want to stop looping as soon as it is
+			 * activated.
+			 */
+			front_button_value = genepi_read_front_button();
+			if(front_button_value == 0)
+				break;
+		}
+	}
+
+	setenv("force_rescue", front_button_value == 1 ? "0" : "1");
+
+	return 0;
+}
+#endif
+
+/*
+ * This function will:
+ * Read the eFuse for MAC addresses, and set ethaddr/eth1addr/usbnet_devaddr
+ * in the environment
+ * Perform fixups to the PHY present on certain boards.  We only need this
+ * function in:
+ * - SPL with either CPSW or USB ethernet support
+ * - Full U-Boot, with either CPSW or USB ethernet
+ * Build in only these cases to avoid warnings about unused variables
+ * when we build an SPL that has neither option but full U-Boot will.
+ */
+#if ((defined(CONFIG_SPL_ETH_SUPPORT) || defined(CONFIG_SPL_USBETH_SUPPORT)) \
+		&& defined(CONFIG_SPL_BUILD)) || \
+	((defined(CONFIG_DRIVER_TI_CPSW) || \
+	  defined(CONFIG_USB_ETHER) && defined(CONFIG_MUSB_GADGET)) && \
+	 !defined(CONFIG_SPL_BUILD))
+
+
+// initialize 88E1510 Marvell Phy
+int board_phy_config(struct phy_device *phydev)
+{
+  //disable CLK125 output as it is not used (EMI purpose)
+  phy_write(phydev, MDIO_DEVAD_NONE, 22, 0x0002);
+  phy_write(phydev, MDIO_DEVAD_NONE, 16, 0x444E);
+
+  //set LED configuration
+  phy_write(phydev, MDIO_DEVAD_NONE, 22, 0x0003);
+  phy_write(phydev, MDIO_DEVAD_NONE, 16, 0x1012);
+
+  //return to page 0
+  phy_write(phydev, MDIO_DEVAD_NONE, 22, 0x0000);
+
+
+  if (phydev->drv->config)
+    phydev->drv->config(phydev);
+
+  return 0;
+}
+
+static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
+
+int board_eth_init(bd_t *bis)
+{
+	int n = 0;
+	uint8_t mac_addr[6];
+	uint32_t mac_hi, mac_lo;
+
+	/* try reading mac address from efuse */
+	mac_lo = readl(&cdev->macid0l);
+	mac_hi = readl(&cdev->macid0h);
+	mac_addr[0] = mac_hi & 0xFF;
+	mac_addr[1] = (mac_hi & 0xFF00) >> 8;
+	mac_addr[2] = (mac_hi & 0xFF0000) >> 16;
+	mac_addr[3] = (mac_hi & 0xFF000000) >> 24;
+	mac_addr[4] = mac_lo & 0xFF;
+	mac_addr[5] = (mac_lo & 0xFF00) >> 8;
+
+#if (defined(CONFIG_DRIVER_TI_CPSW) && !defined(CONFIG_SPL_BUILD)) || \
+	(defined(CONFIG_SPL_ETH_SUPPORT) && defined(CONFIG_SPL_BUILD))
+	if (!getenv("ethaddr")) {
+		printf("<ethaddr> not set. Validating first E-fuse MAC\n");
+		eth_setenv_enetaddr("ethaddr", mac_addr);
+	}
+	
+#endif
+#if defined(CONFIG_USB_ETHER) && \
+	(!defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_USBETH_SUPPORT))
+	if (is_valid_ether_addr(mac_addr))
+		eth_setenv_enetaddr("usbnet_devaddr", mac_addr);
+
+	rv = usb_eth_initialize(bis);
+	if (rv < 0)
+		printf("Error %d registering USB_ETHER\n", rv);
+	else
+		n += rv;
+#endif
+	return n;
+}	 
+
+int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct eaton_boot_data_struct boot_data;
+	unsigned long boot_count;
+	unsigned long reset_flag;	
+	int rc = 0;
+
+	if ( argc != 3){
+		return -1;
+	}
+
+	boot_count = simple_strtoul(argv[1], NULL, 10);
 	reset_flag= simple_strtoul(argv[2], NULL, 10);
 
 	boot_data.boot_count = boot_count > 255 ? 0 : 255 - (u8)boot_count;
