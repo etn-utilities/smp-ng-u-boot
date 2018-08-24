@@ -162,8 +162,9 @@
 	"mmcrootfstype=ext4\0" \
 	"nfsopts=nolock\0" \
 	"bootcounter=0\0" \
-	"bootcounterlimit=3\0" \
+	"bootcounterlimit=4\0" \
 	"boot_type=sep\0" \
+	"force_rescue=0\0" \
 	"power_fail=0\0" \
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
@@ -192,27 +193,24 @@
 			"bootm $loadaddr; " \
 		"fi; " \
 		"\0" \
-	"nandboot= " \
-		"save_boot_data ${bootcounter} ${resetflag}; " \
-		"run ubifs; " \
-		"if test ${bootcounter} -lt ${bootcounterlimit}; then " \
-			"setenv boot_type sep; " \
-		"else " \
+	"nandboot= " \		
+		"if test ${force_rescue} = 1; then " \
+			"echo Booting in rescue mode (button); " \
 			"setenv boot_type ses; " \
-			"echo Booting in rescue mode (counter);" \
-		"fi; " \
-		"if test ${force_toggle_boot} = 1; then " \
-			"if test ${boot_type} = ses; then " \
-				"setenv boot_type sep; " \
-				"echo Booting in primary mode (button);" \
-			"else " \
-				"setenv boot_type ses; " \
-				"echo Booting in rescue mode (button);" \
-			"fi; " \
-		"fi; " \
+			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
+		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
+			"echo Booting in rescue mode (counter=${bootcounter}); " \
+			"setenv boot_type ses; " \			
+		"else " \
+			"echo Booting in primary mode (counter=${bootcounter}); " \
+			"setenv boot_type sep; " \
+			"save_boot_data ${bootcounter} ${resetflag}; " \
+		"fi; " \		
+		"run ubifs; " \	
 		"run nandboot2; " \
 		"setenv boot_type ses; " \
 		"echo Booting in rescue mode (primary failed);" \
+		"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 		"run nandboot2; " \
 		"\0" \
 	"mmcboot= mmc dev ${mmcdev}; " \
