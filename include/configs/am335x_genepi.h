@@ -200,7 +200,8 @@
 			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
 			"echo Booting in rescue mode (counter=${bootcounter}); " \
-			"setenv boot_type ses; " \			
+			"setenv boot_type ses; " \	
+			"save_boot_data ${bootcounterlimit} ${resetflag}; " \		
 		"else " \
 			"echo Booting in primary mode (counter=${bootcounter}); " \
 			"setenv boot_type sep; " \
