@@ -23,27 +23,12 @@
 
 #define CONFIG_SPI_FLASH_ISSI
 
-/* Silent boot console */
-#define CONFIG_DISABLE_PROMPT
-
-#ifdef CONFIG_DISABLE_PROMPT
-#define CONFIG_BOOTDELAY 0
-#define CONFIG_AUTOBOOT_PROMPT ""
-#endif
-
-/* Watchdog */
-#define CONFIG_HW_WATCHDOG
-#define CONFIG_OMAP_WATCHDOG
-
 /* Signature */
 #ifdef VALIDATE_SIGNATURE
 #define VALIDATE_SIGNATURE_KERNEL_ARG ""
 #else
 #define VALIDATE_SIGNATURE_KERNEL_ARG "signed=no "
 #endif		
-
-/* Main PLL Fdll = 300 MHz on Genepi */
-#define CONFIG_SYS_MPUCLK	MPUPLL_M_300
 
 /* Nandflash timing definition */
 /* CONFIG 7 is at 0 because it is configured by the calling function*/
@@ -74,7 +59,6 @@
 #define CONFIG_SYS_NAND_BASE		0x08000000
 #define CONFIG_SYS_NAND_SIZE		(256*1024*1024)
 #define CONFIG_SYS_MAX_NAND_DEVICE  1
-#define CONFIG_SPL_FRAMEWORK
 
 /* set max size to 128 MiB */
 #define CONFIG_SYS_BOOTM_LEN		(16 << 19)
@@ -138,6 +122,7 @@
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) 
 
+#undef CONFIG_BOOTCOMMAND
 #define CONFIG_BOOTCOMMAND \
 	"if test ${boot_source} = \"SPI\"; then " \
 		"run nandboot; " \
@@ -193,21 +178,21 @@
 			"bootm $loadaddr; " \
 		"fi; " \
 		"\0" \
-	"nandboot= " \		
+	"nandboot= " \
 		"if test ${force_rescue} = 1; then " \
 			"echo Booting in rescue mode (button); " \
 			"setenv boot_type ses; " \
 			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
 			"echo Booting in rescue mode (counter=${bootcounter}); " \
-			"setenv boot_type ses; " \	
-			"save_boot_data ${bootcounterlimit} ${resetflag}; " \		
+			"setenv boot_type ses; " \
+			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 		"else " \
 			"echo Booting in primary mode (counter=${bootcounter}); " \
 			"setenv boot_type sep; " \
 			"save_boot_data ${bootcounter} ${resetflag}; " \
-		"fi; " \		
-		"run ubifs; " \	
+		"fi; " \
+		"run ubifs; " \
 		"run nandboot2; " \
 		"setenv boot_type ses; " \
 		"echo Booting in rescue mode (primary failed);" \
@@ -222,8 +207,7 @@
 				"else " \
 					"echo failed to load fitImage;" \
 				"fi;" \
-			"fi ;" \
-		"fi;\0"
+			"fi;\0"
 #endif
 
 /* NS16550 Configuration */
@@ -246,12 +230,12 @@
 /* SPL */
 #ifndef CONFIG_NOR_BOOT
 /* Bootcount using the RTC block */
-#define CONFIG_BOOTCOUNT_LIMIT
+/*#define CONFIG_BOOTCOUNT_LIMIT
 #define CONFIG_BOOTCOUNT_AM33XX
-#define CONFIG_SYS_BOOTCOUNT_BE
+#define CONFIG_SYS_BOOTCOUNT_BE*/
 
 /* USB gadget RNDIS */
-
+#undef CONFIG_SPL_LDSCRIPT
 #define CONFIG_SPL_LDSCRIPT		"arch/arm/mach-omap2/am33xx/u-boot-spl.lds"
 #endif
 

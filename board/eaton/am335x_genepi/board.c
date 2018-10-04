@@ -36,7 +36,7 @@
 #include <watchdog.h>
 #include <environment.h>
 #include "board.h"
-#include <linux/mtd/nand.h>
+#include <linux/mtd/rawnand.h>
 #include <linux/mtd/omap_gpmc.h>
 #include "configs/am335x_genepi.h"
 #include <linux/mtd/mtd.h>
@@ -44,6 +44,7 @@
 #include <nand.h>
 #include <command.h>
 #include <linux/delay.h>
+#include <asm/omap_common.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static u32 boot_device;
@@ -251,6 +252,7 @@ static int genepi_read_front_button(void)
 /*
  * Basic board specific setup.  Pinmux has been handled already.
  */
+#ifndef CONFIG_SPL_BUILD
 int board_init(void)
 {
 	// Write PRM_RSTTIME register to set reset duration to maximum (in number of clock cycles)
@@ -263,7 +265,7 @@ int board_init(void)
 
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
 #if defined(CONFIG_NOR) || defined(CONFIG_NAND)
-  gpmc_init();
+	gpmc_init();
 #endif
 
 	genepi_set_delay_reset_low();
@@ -275,12 +277,14 @@ int board_init(void)
 
 int save_boot_source(void)
 {
-	u32 boot_params = *((u32 *)(SRAM_SCRATCH_SPACE_ADDR + 0x24));
+	u32 boot_params = (u32 *)(OMAP_SRAM_SCRATCH_BOOT_PARAMS);
 	struct omap_boot_parameters *omap_boot_params;
 
 	if ((boot_params < NON_SECURE_SRAM_START) ||
-	    (boot_params > NON_SECURE_SRAM_END))
+	    (boot_params > NON_SECURE_SRAM_END)) {
+		printf("Don't know where we're booting from -- can't find boot params !(%p < %p < %p)\n", NON_SECURE_SRAM_START, boot_params, NON_SECURE_SRAM_END);
 		return 1;
+	}
 
 	omap_boot_params = (struct omap_boot_parameters *)boot_params;
 
@@ -288,27 +292,27 @@ int save_boot_source(void)
 	switch ( boot_device ){
 		case BOOT_DEVICE_SPI:
 			printf("Booting from: SPI\n");
-			setenv("boot_source", "SPI");
+			env_set("boot_source", "SPI");
 		break;
 		case BOOT_DEVICE_MMC1:
 			printf("Booting from: MMC1\n");
-			setenv("boot_source", "MMC1");
+			env_set("boot_source", "MMC1");
 		break;
 		case BOOT_DEVICE_MMC2:
 			printf("Booting from: MMC2\n");
-			setenv("boot_source", "MMC2");
+			env_set("boot_source", "MMC2");
 		break;
 		case BOOT_DEVICE_NAND:
 			printf("Booting from: NAND\n");
-			setenv("boot_source", "NAND");
+			env_set("boot_source", "NAND");
 		break;
 		case BOOT_DEVICE_NAND_I2C:
 			printf("Booting from: NAND I2C\n");
-			setenv("boot_source", "I2C");
+			env_set("boot_source", "I2C");
 		break;
 		default:
 			printf("Booting from: unknown\n");
-			setenv("boot_source", "0");
+			env_set("boot_source", "0");
 		break;
 	}
 
@@ -321,16 +325,16 @@ int write_nand_boot_data(struct eaton_boot_data_struct *boot_data)
 	struct mtd_info *mtd;
 	nand_erase_options_t opts;
 	int dev = 0;
-	mtd = nand_info[0];
+	mtd = get_nand_dev_by_index(0);
 	loff_t offset, size;
 	loff_t maxsize = sizeof(struct eaton_boot_data_struct);
 	int rc = 0;
 
-	if (mtd_arg_off	("private-store", &dev, &offset, &size, &maxsize, MTD_DEV_TYPE_NAND, nand_info[dev]->size)){
+	if (mtd_arg_off	("private-store", &dev, &offset, &size, &maxsize, MTD_DEV_TYPE_NAND, get_nand_dev_by_index(dev)->size)){
 		printf("error: mtd_arg_off\n");;
 	}
 
-	mtd = nand_info[0];
+	mtd = get_nand_dev_by_index(0);
 	memset(&opts, 0, sizeof(opts));
 	opts.offset = offset;
 	opts.length = size;
@@ -345,7 +349,7 @@ int write_nand_boot_data(struct eaton_boot_data_struct *boot_data)
 	}
 
 	size = sizeof(struct eaton_boot_data_struct);
-	rc = nand_write(nand_info[0], offset, (size_t *)&size, (uint8_t *)boot_data);
+	rc = nand_write(get_nand_dev_by_index(0), offset, (size_t *)&size, (uint8_t *)boot_data);
 	if (rc < 0)
 	{
 		printf("error: nand_write\n");
@@ -362,13 +366,13 @@ int read_nand_boot_data(struct eaton_boot_data_struct *boot_data)
 	size_t size;
 	int rc = 0;
 
-	if (mtd_arg_off	("private-store", &dev, &offset, (loff_t *)&size, &maxsize, MTD_DEV_TYPE_NAND, nand_info[dev]->size)){
+	if (mtd_arg_off	("private-store", &dev, &offset, (loff_t *)&size, &maxsize, MTD_DEV_TYPE_NAND, get_nand_dev_by_index(dev)->size)){
 		printf("error: mtd_arg_off\n");
 		return -1;
 	}
 
 	size = sizeof(struct eaton_boot_data_struct);
-	rc = nand_read(nand_info[dev], offset, &size, (uint8_t *)boot_data);
+	rc = nand_read(get_nand_dev_by_index(dev), offset, &size, (uint8_t *)boot_data);
 	if (rc < 0){
 		printf("error: failed reading from nand\n");
 		/* We don't return an error code at this point */
@@ -442,19 +446,19 @@ int board_late_init(void)
 	/* Now set variables based on the header. */
 	strncpy(safe_string, BOARD_NAME, sizeof(BOARD_NAME));
 	safe_string[sizeof(BOARD_NAME)] = 0;
-	setenv("board_name", safe_string);
+	env_set("board_name", safe_string);
 	
 #ifdef CONFIG_DISABLE_PROMPT
-	setenv("bootdelay", "0");
+	env_set("bootdelay", "0");
 #else
-	setenv("bootdelay", "2");
+	env_set("bootdelay", "2");
 #endif
 
 	/* Reading boot cause from PRM_RSTST register */
 	boot_cause = readl(PRM_RSTST);
 	writel(boot_cause, PRM_RSTST);
 	sprintf(boot_cause_str, "%08x", boot_cause);
-	setenv("boot_cause", boot_cause_str);
+	env_set("boot_cause", boot_cause_str);
 
 	save_boot_source();
 
@@ -464,13 +468,13 @@ int board_late_init(void)
 		return -1;
 	}
 	sprintf(reset_flag_str, "%d", boot_data.reset_flag);
-	setenv("resetflag", reset_flag_str);
+	env_set("resetflag", reset_flag_str);
 
 	boot_count = 255 - boot_data.boot_count;
 
 	if (genepi_read_pflatch())
 	{
-		setenv("power_fail", "1");
+		env_set("power_fail", "1");
 		while (read_pflatch_count < 3 && genepi_read_pflatch()) {
 			if (genepi_clear_pflatch() < 0) {
 				printf("error while clearing the pflatch\n");
@@ -486,7 +490,7 @@ int board_late_init(void)
 	}
 
 	sprintf(boot_count_str, "%d", boot_count);
-	setenv("bootcounter", boot_count_str);
+	env_set("bootcounter", boot_count_str);
 
 	if (boot_device == BOOT_DEVICE_SPI ) {
 		timer_start = get_timer(0);
@@ -501,10 +505,11 @@ int board_late_init(void)
 		}
 	}
 
-	setenv("force_rescue", front_button_value == 1 ? "0" : "1");
+	env_set("force_rescue", front_button_value == 1 ? "0" : "1");
 
 	return 0;
 }
+#endif
 #endif
 
 /*
@@ -568,14 +573,14 @@ int board_eth_init(bd_t *bis)
 	(defined(CONFIG_SPL_ETH_SUPPORT) && defined(CONFIG_SPL_BUILD))
 	if (!getenv("ethaddr")) {
 		printf("<ethaddr> not set. Validating first E-fuse MAC\n");
-		eth_setenv_enetaddr("ethaddr", mac_addr);
+		eth_env_set_enetaddr("ethaddr", mac_addr);
 	}
 	
 #endif
 #if defined(CONFIG_USB_ETHER) && \
 	(!defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_USBETH_SUPPORT))
 	if (is_valid_ether_addr(mac_addr))
-		eth_setenv_enetaddr("usbnet_devaddr", mac_addr);
+		eth_env_set_enetaddr("usbnet_devaddr", mac_addr);
 
 	rv = usb_eth_initialize(bis);
 	if (rv < 0)
@@ -586,6 +591,9 @@ int board_eth_init(bd_t *bis)
 	return n;
 }	 
 
+#endif
+
+#ifndef CONFIG_SPL_BUILD
 int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct eaton_boot_data_struct boot_data;
