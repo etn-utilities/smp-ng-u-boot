@@ -10,4 +10,4 @@ ifeq ($(CONFIG_SKIP_LOWLEVEL_INIT),)
 obj-y	:= mux.o
 endif
 
-obj-y	+= board.o
+obj-y	+= board.o arch_setup_gd.o

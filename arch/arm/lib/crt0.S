@@ -78,8 +78,6 @@ ENTRY(_main)
 	mov	sp, r0
 	bl	board_init_f_alloc_reserve
 	mov	sp, r0
-	/* set up gd here, outside any C code */
-	mov	r9, r0
 	bl	board_init_f_init_reserve
 
 	mov	r0, #0
@@ -96,8 +94,12 @@ ENTRY(_main)
 	ldr	r0, [r9, #GD_START_ADDR_SP]	/* sp = gd->start_addr_sp */
 	bic	r0, r0, #7	/* 8-byte alignment for ABI compliance */
 	mov	sp, r0
+	mov	r0, r9				/* r0 = gd (the old one) */
 	ldr	r9, [r9, #GD_BD]		/* r9 = gd->bd */
 	sub	r9, r9, #GD_SIZE		/* new GD is below bd */
+	/* we copy one specific field we need from the SPL, but we could make this a call to a generic gd_fixup function */
+	ldr	r0, [r0, #(GD_OMAP_BOOT_DEVICE_OFFSET)]
+	str	r0, [r9, #(GD_OMAP_BOOT_DEVICE_OFFSET)]
 
 	adr	lr, here
 	ldr	r0, [r9, #GD_RELOC_OFF]		/* r0 = gd->reloc_off */

@@ -17,6 +17,7 @@
 #include <asm/system.h>
 #include <linux/linkage.h>
 #include <asm/armv7.h>
+#include <asm/omap_common.h>
 
 /*************************************************************************
  *
@@ -37,7 +38,11 @@
 
 reset:
 	/* Allow the board to save important registers */
-	b	save_boot_params
+#ifdef CONFIG_SPL_BUILD
+	ldr	r1, =OMAP_SRAM_SCRATCH_BOOT_PARAMS
+        str	r0, [r1]
+#endif
+	mov	r9, r0
 save_boot_params_ret:
 #ifdef CONFIG_ARMV7_LPAE
 /*

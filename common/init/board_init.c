@@ -109,9 +109,7 @@ void board_init_f_init_reserve(ulong base)
 	/* zero the area */
 	memset(gd_ptr, '\0', sizeof(*gd));
 	/* set GD unless architecture did it already */
-#if !defined(CONFIG_ARM)
 	arch_setup_gd(gd_ptr);
-#endif
 	/* next alloc will be higher by one GD plus 16-byte alignment */
 	base += roundup(sizeof(struct global_data), 16);
 

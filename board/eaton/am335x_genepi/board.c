@@ -277,18 +277,7 @@ int board_init(void)
 
 int save_boot_source(void)
 {
-	u32 boot_params = (u32 *)(OMAP_SRAM_SCRATCH_BOOT_PARAMS);
-	struct omap_boot_parameters *omap_boot_params;
-
-	if ((boot_params < NON_SECURE_SRAM_START) ||
-	    (boot_params > NON_SECURE_SRAM_END)) {
-		printf("Don't know where we're booting from -- can't find boot params !(%p < %p < %p)\n", NON_SECURE_SRAM_START, boot_params, NON_SECURE_SRAM_END);
-		return 1;
-	}
-
-	omap_boot_params = (struct omap_boot_parameters *)boot_params;
-
-	boot_device = omap_boot_params->boot_device;
+	boot_device = gd->arch.omap_boot_device;
 	switch ( boot_device ){
 		case BOOT_DEVICE_SPI:
 			printf("Booting from: SPI\n");
@@ -311,7 +300,7 @@ int save_boot_source(void)
 			env_set("boot_source", "I2C");
 		break;
 		default:
-			printf("Booting from: unknown\n");
+			printf("Booting from: unknown: %08x\ngd: %p\n", boot_device, gd);
 			env_set("boot_source", "0");
 		break;
 	}

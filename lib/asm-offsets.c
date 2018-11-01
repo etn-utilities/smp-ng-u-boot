@@ -39,5 +39,9 @@ int main(void)
 
 	DEFINE(GD_NEW_GD, offsetof(struct global_data, new_gd));
 
+	DEFINE(GD_OMAP_BOOT_DEVICE_OFFSET, offsetof(struct global_data, arch.omap_boot_device));
+
+	DEFINE(BOOT_DEVICE_OFFSET, offsetof(struct omap_boot_parameters, boot_device));
+
 	return 0;
 }
