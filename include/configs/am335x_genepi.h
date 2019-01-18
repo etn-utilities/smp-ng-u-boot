@@ -37,7 +37,7 @@
 
 /* Signature */
 #ifdef VALIDATE_SIGNATURE
-#define VALIDATE_SIGNATURE_KERNEL_ARG ""
+#define VALIDATE_SIGNATURE_KERNEL_ARG "module.sig_enforce=1 "
 #else
 #define VALIDATE_SIGNATURE_KERNEL_ARG "signed=no "
 #endif		
