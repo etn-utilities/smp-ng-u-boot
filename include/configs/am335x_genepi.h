@@ -47,7 +47,6 @@
 #define GPMC_LIMITED_ADDRESS 0
 #define GPMC_NAND_FORCE_POSTED_WRITE 0
 
-
 #ifndef CONFIG_SPL_BUILD
 #define CONFIG_NAND
 #define CONFIG_NAND_OMAP_GPMC
@@ -139,10 +138,10 @@
 	"bootpart=0:2\0" \
 	"bootdir=/boot\0" \
 	"bootfile=fitImage\0" \
-	"fdtfile=am335x-io2200.dtb\0" \
 	"console=ttyS4,115200n8 earlyprintk\0" \
 	"optargs=panic=10 nohz=off\0" \
 	"mmcdev=0\0" \
+	"mmcboot_dtb=am335x-io2200-mmc.dtb\0" \
 	"mmcroot=/dev/mmcblk0p2 ro\0" \
 	"mmcrootfstype=ext4\0" \
 	"nfsopts=nolock\0" \
@@ -167,7 +166,7 @@
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
 	"mmcloados=run mmcargs; " \
 		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
-			"bootm ${loadaddr};" \
+			"bootm ${loadaddr}#conf@${mmcboot_dtb};" \
 		"fi;\0" \
 	"ubifs=  ubi part system; " \
 			"ubifsmount ubi0:system; " \
