@@ -286,7 +286,19 @@ int fit_image_verify_required_sigs(const void *fit, int image_noffset,
 	}
 
 	if (verify_count)
+	{
 		*no_sigsp = 0;
+
+#ifndef USE_HOSTCC
+		char strBootArgs[4096] = {0};
+		const char *strBootArgs0 = env_get("bootargs");
+		if (strBootArgs0 == NULL || strstr(strBootArgs0, "sig_verified=") == NULL)
+		{
+			snprintf(strBootArgs, sizeof(strBootArgs), "%s sig_verified=%d", strBootArgs0 ? strBootArgs0 : "", verify_count);		
+			env_set("bootargs", strBootArgs);
+		}
+#endif
+	}
 
 	return 0;
 }
@@ -437,6 +449,7 @@ int fit_config_verify_required_sigs(const void *fit, int conf_noffset,
 {
 	int noffset;
 	int sig_node;
+	int nVerified = 0;
 
 	/* Work out what we need to verify */
 	sig_node = fdt_subnode_offset(sig_blob, 0, FIT_SIG_NODENAME);
@@ -460,7 +473,21 @@ int fit_config_verify_required_sigs(const void *fit, int conf_noffset,
 			       fit_get_name(sig_blob, noffset, NULL));
 			return ret;
 		}
+		nVerified++;
 	}
+
+#ifndef USE_HOSTCC
+	if (nVerified > 0)
+	{
+		char strBootArgs[4096] = {0};
+		const char *strBootArgs0 = env_get("bootargs");
+		if (strBootArgs0 == NULL || strstr(strBootArgs0, "sig_verified=") == NULL)
+		{
+			snprintf(strBootArgs, sizeof(strBootArgs), "%s sig_verified=%d", strBootArgs0 ? strBootArgs0 : "", nVerified);		
+			env_set("bootargs", strBootArgs);
+		}
+	}
+#endif
 
 	return 0;
 }
