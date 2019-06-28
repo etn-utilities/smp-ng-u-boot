@@ -49,6 +49,7 @@
 DECLARE_GLOBAL_DATA_PTR;
 static u32 boot_device;
 #define GPIO_TO_PIN(bank, gpio) (32 * (bank) + (gpio))
+#define BOOT_COUNTER_LIMIT		4
 #define FORCE_BOOT_RESCUE_DELAY 5000
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
 
@@ -425,7 +426,7 @@ int board_late_init(void)
 	unsigned long boot_count;
 	char boot_count_str[5];
 	char reset_flag_str[5];
-	u32 timer_start;
+	u32 timer_start, timer_delay, timer_delay_print;
 	int front_button_value = 1;
 	int rc = 0;
 	u32 boot_cause;
@@ -437,12 +438,6 @@ int board_late_init(void)
 	safe_string[sizeof(BOARD_NAME)] = 0;
 	env_set("board_name", safe_string);
 	
-#ifdef CONFIG_DISABLE_PROMPT
-	env_set("bootdelay", "0");
-#else
-	env_set("bootdelay", "2");
-#endif
-
 	/* Reading boot cause from PRM_RSTST register */
 	boot_cause = readl(PRM_RSTST);
 	writel(boot_cause, PRM_RSTST);
@@ -480,18 +475,27 @@ int board_late_init(void)
 
 	sprintf(boot_count_str, "%d", boot_count);
 	env_set("bootcounter", boot_count_str);
+	sprintf(boot_count_str, "%d", BOOT_COUNTER_LIMIT);
+	env_set("bootcounterlimit", boot_count_str);
 
-	if (boot_device == BOOT_DEVICE_SPI ) {
+	if (boot_device == BOOT_DEVICE_SPI && boot_count < BOOT_COUNTER_LIMIT) {
+		printf("Press the front panel button to force rescue mode in %d seconds", FORCE_BOOT_RESCUE_DELAY / 1000);
 		timer_start = get_timer(0);
-		while (get_timer(timer_start) < FORCE_BOOT_RESCUE_DELAY) {
+		timer_delay_print = 0;
+		while ((timer_delay = get_timer(timer_start)) < FORCE_BOOT_RESCUE_DELAY) {
 			/*
-			 * The GPIO is active low and we want to stop looping as soon as it is
-			 * activated.
+			 * The GPIO is active low and we want to stop looping as soon as it is activated.
 			 */
 			front_button_value = genepi_read_front_button();
 			if(front_button_value == 0)
 				break;
+
+			if (timer_delay >= timer_delay_print) {
+				timer_delay_print += 1000;
+				printf(".");
+			}
 		}
+		printf("\n");
 	}
 
 	env_set("force_rescue", front_button_value == 1 ? "0" : "1");
