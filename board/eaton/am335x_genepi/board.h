@@ -11,7 +11,6 @@
 #ifndef _BOARD_H_
 #define _BOARD_H_
 
-
 #define HDR_NAME_LEN		8
 
 /*DDR3 timing definition*/
@@ -70,13 +69,6 @@ void enable_i2c0_pin_mux(void);
 void enable_board_pin_mux(void);
 
 int read_reset_flag(void);
-
-struct eaton_boot_data_struct
-{
-	u8 boot_count;
-	u8 reset_flag;
-	u8 pad[510]; /* Need to be aligned to 512 bytes*/
-};
 
 enum SysBoot
 {

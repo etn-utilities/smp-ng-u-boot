@@ -46,10 +46,12 @@
 #include <linux/delay.h>
 #include <asm/omap_common.h>
 
+#include <smp/bootdata.h>
+
 DECLARE_GLOBAL_DATA_PTR;
 static u32 boot_device;
 #define GPIO_TO_PIN(bank, gpio) (32 * (bank) + (gpio))
-#define BOOT_COUNTER_LIMIT		4
+#define BOOT_COUNTER_LIMIT		BOOT_COUNT_LIMIT
 #define FORCE_BOOT_RESCUE_DELAY 5000
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
 
@@ -311,7 +313,6 @@ int save_boot_source(void)
 
 int write_nand_boot_data(struct eaton_boot_data_struct *boot_data)
 {
-
 	struct mtd_info *mtd;
 	nand_erase_options_t opts;
 	int dev = 0;
@@ -596,10 +597,12 @@ int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	if ( argc != 3){
 		return -1;
-	}
+	}	
 
 	boot_count = simple_strtoul(argv[1], NULL, 10);
 	reset_flag= simple_strtoul(argv[2], NULL, 10);
+
+	read_nand_boot_data(&boot_data);
 
 	boot_data.boot_count = boot_count > 255 ? 0 : 255 - (u8)boot_count;
 	boot_data.reset_flag = reset_flag > 255 ? 255 : (u8)reset_flag;
