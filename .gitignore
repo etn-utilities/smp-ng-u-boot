@@ -89,4 +89,4 @@ GTAGS
 *~
 \#*#
 singletask.lock
-include/smp/bootdata.h
+include/bootdata/bootdata.h

@@ -46,7 +46,7 @@
 #include <linux/delay.h>
 #include <asm/omap_common.h>
 
-#include <smp/bootdata.h>
+#include <bootdata/bootdata.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 static u32 boot_device;
