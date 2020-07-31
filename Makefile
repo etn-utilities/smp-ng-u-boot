@@ -378,10 +378,6 @@ KBUILD_AFLAGS   := -D__ASSEMBLY__
 # Don't generate position independent code
 KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
 KBUILD_AFLAGS	+= $(call cc-option,-fno-PIE)
-ifdef VALIDATE_SIGNATURE
-	HOSTCFLAGS += -DVALIDATE_SIGNATURE=1
-	KBUILD_CFLAGS += -DVALIDATE_SIGNATURE=1
-endif
 
 # Read UBOOTRELEASE from include/config/uboot.release (if it exists)
 UBOOTRELEASE = $(shell cat include/config/uboot.release 2> /dev/null)

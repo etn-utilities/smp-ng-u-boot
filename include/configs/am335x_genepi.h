@@ -21,15 +21,12 @@
 
 #include <configs/ti_am335x_common.h>
 
+#ifndef KERNEL_EXTRA_ARGS
+#define KERNEL_EXTRA_ARGS ""
+#endif
+
 #define CONFIG_SPI_FLASH_ISSI
-
-/* Signature */
-#ifdef VALIDATE_SIGNATURE
-#define VALIDATE_SIGNATURE_KERNEL_ARG ""
-#else
-#define VALIDATE_SIGNATURE_KERNEL_ARG "signed=no "
-#endif		
-
+	
 /* Nandflash timing definition */
 /* CONFIG 7 is at 0 because it is configured by the calling function*/
 #define M_NAND_GPMC_CONFIG1	0x00000800
@@ -160,8 +157,9 @@
 		"${optargs} " \
 		"boot_type=${boot_type} " \
 		"boot_cause=${boot_cause} " \
-		"power_fail=${power_fail} "\
-		VALIDATE_SIGNATURE_KERNEL_ARG \
+		"power_fail=${power_fail} " \
+		"force_rescue=${force_rescue} " \
+		KERNEL_EXTRA_ARGS \
 		"\0" \
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
 	"mmcloados=run mmcargs; " \
