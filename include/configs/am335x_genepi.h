@@ -141,7 +141,7 @@
 	"console=ttyS4,115200n8 earlyprintk\0" \
 	"optargs=panic=10 nohz=off\0" \
 	"mmcdev=0\0" \
-	"mmcboot_dtb=am335x-io2200-mmc.dtb\0" \
+	"mmcboot_dtb=am335x-io2000-mmc.dtb\0" \
 	"mmcroot=/dev/mmcblk0p2 ro\0" \
 	"mmcrootfstype=ext4\0" \
 	"nfsopts=nolock\0" \
@@ -172,6 +172,10 @@
 			"ubifsmount ubi0:system; " \
 		"\0" \
 	"nandboot2= " \
+		"if ubifsload $loadaddr /boot/${boot_type}/kernel.bin; then " \
+			"run nandargs; " \
+			"bootm $loadaddr; " \
+		"fi; " \
 		"if ubifsload $loadaddr /boot/${boot_type}/fitImage-initramfs-io2200-io2200.bin; then " \
 			"run nandargs; " \
 			"bootm $loadaddr; " \

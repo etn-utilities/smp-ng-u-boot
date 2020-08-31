@@ -182,7 +182,7 @@ dtb-$(CONFIG_AM33XX) += am335x-boneblack.dtb am335x-bone.dtb \
 	am335x-evmsk.dtb \
 	am335x-bonegreen.dtb \
 	am335x-icev2.dtb \
-	am335x-io2200.dtb \
+	am335x-io2000.dtb \
 	am335x-pxm50.dtb \
 	am335x-rut.dtb \
 	am335x-pdu001.dtb
