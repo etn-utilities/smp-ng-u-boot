@@ -170,35 +170,46 @@
 			"ubifsmount ubi0:system; " \
 		"\0" \
 	"nandboot2= " \
-		"if ubifsload $loadaddr /boot/${boot_type}/kernel.bin; then " \
+		"if test -e ubi system   /boot/${boot_type}/kernel.bin; then " \
+			"ubifsload $loadaddr /boot/${boot_type}/kernel.bin; " \
 			"run nandargs; " \
 			"bootm $loadaddr; " \
-		"fi; " \
-		"if ubifsload $loadaddr /boot/${boot_type}/fitImage-initramfs-io2200-io2200.bin; then " \
+		"elif test -e ubi system /boot/${boot_type}/fitImage-initramfs-io2200-io2200.bin; then " \
+			"ubifsload $loadaddr /boot/${boot_type}/fitImage-initramfs-io2200-io2200.bin; " \
 			"run nandargs; " \
 			"bootm $loadaddr; " \
+		"else " \
+			"echo No kernel found in /boot/${boot_type}; " \
 		"fi; " \
 		"\0" \
 	"nandboot= " \
+		"run ubifs; " \
 		"if test ${force_rescue} = 1; then " \
+			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 			"echo Booting in rescue mode (button); " \
 			"setenv boot_type ses; " \
-			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
+			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 			"echo Booting in rescue mode (counter=${bootcounter}); " \
 			"setenv boot_type ses; " \
-			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
+		"elif test -e ubi system /boot/diag/kernel.bin || test -e ubi system /boot/diag/fitImage-initramfs-io2200-io2200.bin ; then " \
+			"save_boot_data ${bootcounter} ${resetflag}; " \
+			"echo Booting in diagnostics mode; " \
+			"setenv boot_type diag; " \
+			"run nandboot2; " \
 		"else " \
+			"save_boot_data ${bootcounter} ${resetflag}; " \
 			"echo Booting in primary mode (counter=${bootcounter}); " \
 			"setenv boot_type sep; " \
-			"save_boot_data ${bootcounter} ${resetflag}; " \
 		"fi; " \
-		"run ubifs; " \
 		"run nandboot2; " \
+		"echo Booting in rescue mode (${boot_type} failed);" \
 		"setenv boot_type ses; " \
-		"echo Booting in rescue mode (primary failed);" \
 		"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 		"run nandboot2; " \
+		"echo Failed to start the rescue; " \
+		"sleep 5; " \
+		"reset; " \
 		"\0" \
 	"mmcboot= mmc dev ${mmcdev}; " \
 			"if mmc rescan; then " \

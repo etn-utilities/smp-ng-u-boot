@@ -90,3 +90,13 @@ GTAGS
 \#*#
 singletask.lock
 include/bootdata/bootdata.h
+arch/arm/dts/am335x-io2000-crypto.dtsi
+arch/arm/dts/am335x-io2000-gpio.dtsi
+arch/arm/dts/am335x-io2000-mmc.dts
+arch/arm/dts/am335x-io2000-nand.dtsi
+arch/arm/dts/am335x-io2000-nor.dtsi
+arch/arm/dts/am335x-io2000-pru.dtsi
+arch/arm/dts/am335x-io2000.dts
+arch/arm/dts/am335x-io2000.dtsi
+configs/am335x_io2000_defconfig
+include/environment/pxred/pxred_common.h
