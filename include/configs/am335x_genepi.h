@@ -164,7 +164,7 @@
 	"loadimage=load mmc ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
 	"mmcloados=run mmcargs; " \
 		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
-			"bootm ${loadaddr}#conf@${mmcboot_dtb};" \
+			"bootm ${loadaddr}#conf-${mmcboot_dtb};" \
 		"fi;\0" \
 	"ubifs=  ubi part system; " \
 			"ubifsmount ubi0:system; " \
