@@ -184,14 +184,16 @@
 		"\0" \
 	"nandboot= " \
 		"run ubifs; " \
-		"if test ${force_rescue} = 1; then " \
+		"if test ${force_rescue} != 0; then " \
 			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 			"echo Booting in rescue mode (button); " \
 			"setenv boot_type ses; " \
+			"setenv force_rescue 1; " \
 		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
 			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 			"echo Booting in rescue mode (counter=${bootcounter}); " \
 			"setenv boot_type ses; " \
+			"setenv force_rescue 2; " \
 		"elif test -e ubi system /boot/diag/kernel.bin || test -e ubi system /boot/diag/fitImage-initramfs-io2200-io2200.bin ; then " \
 			"save_boot_data ${bootcounter} ${resetflag}; " \
 			"echo Booting in diagnostics mode; " \
@@ -205,6 +207,7 @@
 		"run nandboot2; " \
 		"echo Booting in rescue mode (${boot_type} failed);" \
 		"setenv boot_type ses; " \
+		"setenv force_rescue 3; " \
 		"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 		"run nandboot2; " \
 		"echo Failed to start the rescue; " \
