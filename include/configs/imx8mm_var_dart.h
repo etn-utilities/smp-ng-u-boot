@@ -86,7 +86,7 @@
 	"fdt_high=0xffffffffffffffff\0"		\
 	"boot_fdt=try\0" \
 	"boot_fit=no\0" \
-	"fdt_file=undefined\0" \
+	"fdt_file=imx8mm-var-dart-dt8mcustomboard.dtb\0" \
 	"ip_dyn=yes\0" \
 	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)"\0" \
 	"mmcblk=1\0" \
