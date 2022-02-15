@@ -46,6 +46,10 @@
 
 #define CONFIG_REMAKE_ELF
 
+#ifndef KERNEL_EXTRA_ARGS
+#define KERNEL_EXTRA_ARGS ""
+#endif
+
 /* ENET Config */
 #if defined(CONFIG_FEC_MXC)
 #define CONFIG_ETHPRIME                 "FEC"
@@ -68,20 +72,43 @@
 	"bootdir=/boot\0"	\
 	"script=boot.scr\0" \
 	"image=Image.gz\0" \
-	"console=undefined\0" \
+	"console=ttymxc0,115200\0" \
 	"img_addr=0x42000000\0"			\
 	"fdt_addr=0x43000000\0"			\
 	"fdt_high=0xffffffffffffffff\0"		\
 	"boot_fdt=try\0" \
-	"ip_dyn=yes\0" \
 	"fdt_file=imx8mm-var-dart-dt8mcustomboard.dtb\0" \
 	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)"\0" \
-	"mmcblk=1\0" \
 	"mmcautodetect=yes\0" \
 	"mmcpart=1\0" \
+	"mmcroot=/dev/mmcblk1p1\0" \
+	"mmcrootfstype=btrfs\0" \
+	"emmcpart=7\0" \
 	"m4_addr=0x7e0000\0" \
 	"m4_bin=hello_world.bin\0" \
 	"use_m4=no\0" \
+	"optargs=panic=10 nohz=off\0" \
+	"bootcounter=0\0" \
+	"bootcounterlimit=4\0" \
+	"boot_type=sep\0" \
+	"force_rescue=0\0" \
+	"power_fail=0\0" \
+	"mmcargs=setenv bootargs console=${console} " \
+		"${optargs} " \
+		"${kernelargs} " \
+		"root=${mmcroot} rootwait rw ${cma_size}" \
+		"rootfstype=${mmcrootfstype} " \
+		"boot_type=${boot_type} " \
+		"\0" \
+	"emmcargs=setenv bootargs console=${console} " \
+		"${optargs} " \
+		"${kernelargs} " \
+		"boot_type=${boot_type} " \
+		"boot_cause=${boot_cause} " \
+		"power_fail=${power_fail} " \
+		"force_rescue=${force_rescue} " \
+		KERNEL_EXTRA_ARGS \
+		"\0" \
 	"loadm4bin=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${m4_bin}; " \
 		"cp.b ${loadaddr} ${m4_addr} ${filesize}\0" \
 	"runm4bin=" \
@@ -92,40 +119,9 @@
 			"dcache flush; " \
 		"fi; " \
 		"bootaux ${m4_addr};\0" \
-	"optargs=setenv bootargs ${bootargs} ${kernelargs};\0" \
-	"setconsole=" \
-		"if test $console = undefined; then " \
-			"if test $board_name = VAR-SOM-MX8M-MINI; then " \
-				"setenv console ttymxc3,115200; " \
-			"else " \
-				"setenv console ttymxc0,115200; " \
-			"fi; " \
-		"fi; \0" \
-	"mmcargs=run setconsole; setenv bootargs console=${console} " \
-		"root=/dev/mmcblk${mmcblk}p${mmcpart} rootwait rw ${cma_size}\0 " \
-	"loadbootscript=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${script};\0" \
-	"bootscript=echo Running bootscript from mmc ...; " \
-		"source\0" \
 	"loadimage=load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image};" \
 		"unzip ${img_addr} ${loadaddr}\0" \
-	"findfdt=" \
-		"if test $fdt_file = undefined; then " \
-			"if test $board_name = VAR-SOM-MX8M-MINI; then " \
-				"if test $carrier_rev = legacy; then " \
-					"setenv fdt_file imx8mm-var-som-symphony-legacy.dtb; " \
-				"else " \
-					"setenv fdt_file imx8mm-var-som-symphony.dtb; " \
-				"fi; " \
-			"else " \
-				"if test $carrier_rev = legacy; then " \
-					"setenv fdt_file imx8mm-var-dart-dt8mcustomboard-legacy.dtb; " \
-				"else " \
-					"setenv fdt_file imx8mm-var-dart-dt8mcustomboard.dtb; " \
-				"fi; " \
-			"fi; " \
-		"fi; \0" \
-	"loadfdt=run findfdt; " \
-		"echo fdt_file=${fdt_file}; " \
+	"loadfdt=echo fdt_file=${fdt_file}; " \
 		"load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}\0" \
 	"ramsize_check="\
 		"if test $sdram_size -le 512; then " \
@@ -135,7 +131,6 @@
 		"fi;\0" \
 	"mmcboot=echo Booting from mmc ...; " \
 		"run mmcargs; " \
-		"run optargs; " \
 		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
 			"if run loadfdt; then " \
 				"booti ${loadaddr} - ${fdt_addr}; " \
@@ -145,48 +140,62 @@
 		"else " \
 			"echo wait for boot; " \
 		"fi;\0" \
-	"netargs=run setconsole; setenv bootargs console=${console} " \
-		"root=/dev/nfs ${cma_size} " \
-		"ip=dhcp nfsroot=${serverip}:${nfsroot},v3,tcp\0" \
-	"netboot=echo Booting from net ...; " \
-		"if test ${ip_dyn} = yes; then " \
-			"setenv get_cmd dhcp; " \
+	"emmcboot2= " \
+		"if test -e  ${mmcdev}:${emmcpart} /boot/${boot_type}/kernel.bin; then " \
+			"load mmc ${mmcdev}:${emmcpart} ${img_addr} /boot/${boot_type}/kernel.bin; " \
+			"run emmcargs; " \
+			"bootm ${img_addr}; " \
 		"else " \
-			"setenv get_cmd tftp; " \
+			"echo No kernel found in /boot/${boot_type}; " \
 		"fi; " \
-		"${get_cmd} ${img_addr} ${image}; unzip ${img_addr} ${loadaddr};" \
-		"run netargs; " \
-		"run optargs; " \
-		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
-			"run findfdt; " \
-			"echo fdt_file=${fdt_file}; " \
-			"if ${get_cmd} ${fdt_addr} ${fdt_file}; then " \
-				"booti ${loadaddr} - ${fdt_addr}; " \
-			"else " \
-				"echo WARN: Cannot load the DT; " \
-			"fi; " \
+		"\0" \
+	"emmcboot= " \
+		"if test ${force_rescue} = 1; then " \
+			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
+			"echo Booting in rescue mode (button); " \
+			"setenv boot_type ses; " \
+		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
+			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
+			"echo Booting in rescue mode (counter=${bootcounter}); " \
+			"setenv boot_type ses; " \
+		"elif test -e mmc ${mmcdev}:${emmcpart} /boot/diag/kernel.bin ; then " \
+			"save_boot_data ${bootcounter} ${resetflag}; " \
+			"echo Booting in diagnostics mode; " \
+			"setenv boot_type diag; " \
+			"run emmcboot2; " \
 		"else " \
-			"booti; " \
-		"fi;\0"
+			"echo Booting in primary mode (counter=${bootcounter}); " \
+			"setenv boot_type sep; " \
+		"fi; " \
+		"run emmcboot2; " \
+		"echo Booting in rescue mode (${boot_type} failed);" \
+		"setenv boot_type ses; " \
+		"save_boot_data ${bootcounterlimit} ${resetflag}; " \
+		"run emmcboot2; " \
+		"echo Failed to start the rescue; " \
+		"sleep 5; " \
+		"reset; " \
+		"\0" \
 
 #define CONFIG_BOOTCOMMAND \
 	"run ramsize_check; " \
 	"mmc dev ${mmcdev}; "\
 	"if mmc rescan; then " \
+		"if test ${mmcdev} = 2; then " \
+			"setenv mmcpart 7; " \
+		"fi; " \
 		"if test ${use_m4} = yes && run loadm4bin; then " \
 			"run runm4bin; " \
 		"fi; " \
-		"if run loadbootscript; then " \
-			"run bootscript; " \
-		"else " \
+		"if test ${mmcdev} = 1; then " \
 			"if run loadimage; then " \
 				"run mmcboot; " \
-			"else " \
-				"run netboot; " \
 			"fi; " \
+		"else " \
+			"run emmcboot; " \
 		"fi; " \
 	"else " \
-		"booti ${loadaddr} - ${fdt_addr}; " \
+		"echo Failed to load fitImage;" \
 	"fi;"
 
 /* Link Definitions */
