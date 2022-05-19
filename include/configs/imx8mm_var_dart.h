@@ -96,9 +96,14 @@
 	"mmcblk=1\0" \
 	"mmcpart=1\0" \
 	"mmcautodetect=yes\0" \
+	"mmcroot=/dev/mmcblk${mmcblk}p${mmcpart}\0" \
+	"mmcrootfstype=btrfs\0" \
+	"kexecpart=3\0" \
+	"emmcpart=5\0" \
 	"m4_addr=0x7e0000\0" \
 	"m4_bin=hello_world.bin\0" \
 	"use_m4=no\0" \
+	"dfu_alt_info=mmc 2=1 raw 0x42 0x1000 mmcpart\0" \
 	"optargs=panic=10 nohz=off\0" \
 	"bootcounter=0\0" \
 	"bootcounterlimit=4\0" \
@@ -166,7 +171,7 @@
 			"fi; " \
 		"fi;\0" \
 	"emmcboot2= " \
-		"if test -e  ${mmcdev}:${emmcpart} /boot/${boot_type}/kernel.bin; then " \
+		"if test -e mmc ${mmcdev}:${emmcpart} /boot/${boot_type}/kernel.bin; then " \
 			"load mmc ${mmcdev}:${emmcpart} ${img_addr} /boot/${boot_type}/kernel.bin; " \
 			"run emmcargs; " \
 			"bootm ${img_addr}; " \
@@ -175,27 +180,35 @@
 		"fi; " \
 		"\0" \
 	"emmcboot= " \
-		"if test ${force_rescue} = 1; then " \
-			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
+		"if test -e mmc ${mmcdev}:${kexecpart} /boot/kernel.bin; then " \
+			"load mmc ${mmcdev}:${kexecpart} ${img_addr} /boot/kernel.bin; " \
+			"run emmcargs; " \
+			"bootm ${img_addr}; " \
+		"elif test ${force_rescue} != 0; then " \
+			"save_boot_data ${bootcounterlimit}; " \
 			"echo Booting in rescue mode (button); " \
 			"setenv boot_type ses; " \
+			"setenv force_rescue 1; " \
 		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
-			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
+			"save_boot_data ${bootcounterlimit}; " \
 			"echo Booting in rescue mode (counter=${bootcounter}); " \
 			"setenv boot_type ses; " \
+			"setenv force_rescue 2; " \
 		"elif test -e mmc ${mmcdev}:${emmcpart} /boot/diag/kernel.bin ; then " \
-			"save_boot_data ${bootcounter} ${resetflag}; " \
+			"save_boot_data ${bootcounter}; " \
 			"echo Booting in diagnostics mode; " \
 			"setenv boot_type diag; " \
 			"run emmcboot2; " \
 		"else " \
+			"save_boot_data ${bootcounter}; " \
 			"echo Booting in primary mode (counter=${bootcounter}); " \
 			"setenv boot_type sep; " \
 		"fi; " \
 		"run emmcboot2; " \
 		"echo Booting in rescue mode (${boot_type} failed);" \
 		"setenv boot_type ses; " \
-		"save_boot_data ${bootcounterlimit} ${resetflag}; " \
+		"setenv force_rescue 3; " \
+		"save_boot_data ${bootcounterlimit}; " \
 		"run emmcboot2; " \
 		"echo Failed to start the rescue; " \
 		"sleep 5; " \
