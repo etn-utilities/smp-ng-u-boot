@@ -16,11 +16,24 @@
 #include <asm/arch/clock.h>
 #include <usb.h>
 #include <dm.h>
+#include <command.h>
+#include <mmc.h>
+#include <blk.h>
+#include <fs.h>
 
 #include "../common/imx8_eeprom.h"
 #include "imx8mm_var_dart.h"
 
+#include <bootdata/bootdata.h>
+
 DECLARE_GLOBAL_DATA_PTR;
+static u32 g_boot_device = SMP_BOOT_UNKNOWN;
+#define BOOT_COUNTER_LIMIT		BOOT_COUNT_LIMIT
+#define FORCE_BOOT_RESCUE_DELAY 5000
+
+#define BOOTDATA_IFACE		"mmc"
+#define BOOTDATA_PART		"2:2"
+#define BOOTDATA_FILENAME 	"/bootdata.bin"
 
 extern int var_setup_mac(struct var_eeprom *eeprom);
 
@@ -65,6 +78,33 @@ int get_board_id(void)
 
 	return board_id;
 }
+
+int set_boot_device(void)
+{
+	g_boot_device = smp_get_current_mmc_device();
+
+	switch (g_boot_device)
+	{
+		case 1:
+			printf("Booting from: MMC1 - SD CARD \n");
+			env_set("boot_source", "MMC1");
+			g_boot_device = SMP_BOOT_SD_CARD;
+		break;
+		case 2:
+			printf("Booting from: MMC2 - INTERNAL EMMC\n");
+			env_set("boot_source", "MMC2");
+			g_boot_device = SMP_BOOT_INTERNAL_EMMC;
+		break;
+		default:
+			printf("Booting from: unknown: %08x\ngd: %p\n", g_boot_device, gd);
+			env_set("boot_source", "0");
+			g_boot_device = SMP_BOOT_UNKNOWN;
+		break;
+	}
+
+	return 0;
+}
+
 #endif
 
 int var_get_som_rev(struct var_eeprom *ep)
@@ -187,6 +227,36 @@ static int var_detect_dart_carrier_rev(void)
 	return dart_carrier_rev;
 }
 
+static int bootdata_read(struct eaton_boot_data_struct *boot_data)
+{
+	loff_t len_read = 0;
+	int ret;
+
+	if (fs_set_blk_dev(BOOTDATA_IFACE, BOOTDATA_PART, FS_TYPE_EXT))
+		return 1;
+
+	ret = fs_read(BOOTDATA_FILENAME, (ulong)boot_data, 0, sizeof(struct eaton_boot_data_struct), &len_read);
+	if (ret < 0)
+		return 2;
+
+	return 0;
+}
+
+static int bootdata_write(const struct eaton_boot_data_struct *boot_data)
+{
+	loff_t len_written = 0;
+	int ret;
+
+	if (fs_set_blk_dev(BOOTDATA_IFACE, BOOTDATA_PART, FS_TYPE_EXT))
+		return 1;
+
+	ret = fs_write(BOOTDATA_FILENAME, (ulong)boot_data, 0, sizeof(struct eaton_boot_data_struct), &len_written);
+	if (ret < 0)
+		return 2;
+
+	return 0;
+}
+
 #define SDRAM_SIZE_STR_LEN 5
 int board_late_init(void)
 {
@@ -196,6 +266,11 @@ int board_late_init(void)
 	struct var_eeprom *ep = VAR_EEPROM_DATA;
 	struct var_carrier_eeprom carrier_eeprom;
 	char carrier_rev[16] = {0};
+	
+	struct eaton_boot_data_struct boot_data = {0};
+	unsigned long boot_count;
+	char boot_count_str[5];
+	int rc = 0;
 
 #ifdef CONFIG_FEC_MXC
 	var_setup_mac(ep);
@@ -243,5 +318,106 @@ int board_late_init(void)
 	board_late_mmc_env_init();
 #endif
 
+	set_boot_device();
+
+	if(g_boot_device == SMP_BOOT_INTERNAL_EMMC)
+	{
+		rc = bootdata_read(&boot_data);		
+		if (rc != 0)
+		{
+			printf("Error reading bootdata.bin\n");
+			memset(&boot_data, 0, sizeof(boot_data));
+		}
+
+		boot_count = boot_data.boot_count;
+
+		//TODO Power fail wi 
+		// if (genepi_read_pflatch())
+		// {
+		// 	env_set("power_fail", "1");
+		// 	while (read_pflatch_count < 3 && genepi_read_pflatch()) {
+		// 		if (genepi_clear_pflatch() < 0) {
+		// 			printf("error while clearing the pflatch\n");
+		// 			return -1;
+		// 		}
+
+		// 		read_pflatch_count++;
+		// 	}
+		// }
+		// else
+		// {
+				boot_count++;
+		// }
+
+		sprintf(boot_count_str, "%d", boot_count);
+		env_set("bootcounter", boot_count_str);
+		sprintf(boot_count_str, "%d", BOOT_COUNTER_LIMIT);
+		env_set("bootcounterlimit", boot_count_str);
+
+
+	//TODO Force rescue wi 
+	// if (g_boot_device == BOOT_DEVICE_SPI && boot_count < BOOT_COUNTER_LIMIT) {
+	// 	printf("Press the front panel button to force rescue mode in %d seconds", FORCE_BOOT_RESCUE_DELAY / 1000);
+	// 	timer_start = get_timer(0);
+	// 	timer_delay_print = 0;
+	// 	while ((timer_delay = get_timer(timer_start)) < FORCE_BOOT_RESCUE_DELAY) {
+	// 		/*
+	// 		 * The GPIO is active low and we want to stop looping as soon as it is activated.
+	// 		 */
+	// 		front_button_value = genepi_read_front_button();
+	// 		if(front_button_value == 0)
+	// 			break;
+
+	// 		if (timer_delay >= timer_delay_print) {
+	// 			timer_delay_print += 1000;
+	// 			printf(".");
+	// 		}
+	// 	}
+	// 	printf("\n");
+	// }
+
+	// env_set("force_rescue", front_button_value == 1 ? "0" : "1");
+
+	}
+
 	return 0;
 }
+
+#ifndef CONFIG_SPL_BUILD
+int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct eaton_boot_data_struct boot_data = {0};
+	int rc = -1;
+	
+	if (argc < 2)
+	{
+		printf("Insufficient input arguments\n");
+		return -1;
+	}
+
+	if (g_boot_device == SMP_BOOT_INTERNAL_EMMC)
+	{
+		rc = bootdata_read(&boot_data);		
+		if (rc != 0)
+		{
+			printf("Error reading bootdata.bin\n");
+			memset(&boot_data, 0, sizeof(boot_data));
+		}
+
+		boot_data.boot_count = (u8)simple_strtoul(argv[1], NULL, 10);
+
+		rc = bootdata_write(&boot_data);		
+		if (rc != 0)
+		{
+			printf("Error writing bootdata.bin\n");
+			memset(&boot_data, 0, sizeof(boot_data));
+		}
+	}
+
+	return rc;
+}
+
+U_BOOT_CMD(save_boot_data, 3, 0, do_save_boot_data,
+			"save_boot_data - Save the bootstruct to emmc memory. \n",
+			"save_boot_data boot_count boot_limit reset_flag\n The maximum value is 0xff or 255");
+#endif
