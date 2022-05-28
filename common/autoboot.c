@@ -326,12 +326,15 @@ static void process_fdt_options(const void *blob)
 const char *bootdelay_process(void)
 {
 	char *s;
-	int bootdelay;
+	int bootdelay, bootmenu_show;
 
 	bootcount_inc();
 
 	s = env_get("bootdelay");
 	bootdelay = s ? (int)simple_strtol(s, NULL, 10) : CONFIG_BOOTDELAY;
+
+	s = env_get("bootmenu_show");
+	bootmenu_show = s ? (int)simple_strtol(s, NULL, 10) : 0;
 
 	if (IS_ENABLED(CONFIG_OF_CONTROL))
 		bootdelay = fdtdec_get_config_int(gd->fdt_blob, "bootdelay",
@@ -354,7 +357,7 @@ const char *bootdelay_process(void)
 
 	debug("### main_loop entered: bootdelay=%d\n\n", bootdelay);
 
-	if (IS_ENABLED(CONFIG_AUTOBOOT_MENU_SHOW))
+	if (IS_ENABLED(CONFIG_AUTOBOOT_MENU_SHOW) && bootmenu_show)
 		bootdelay = menu_show(bootdelay);
 	bootretry_init_cmd_timeout();
 
