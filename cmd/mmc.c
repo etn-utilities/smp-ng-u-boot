@@ -16,11 +16,6 @@
 
 static int curr_device = -1;
 
-int smp_get_current_mmc_device()
-{
-	return curr_device;
-}
-
 static void print_mmcinfo(struct mmc *mmc)
 {
 	int i;

@@ -29,7 +29,6 @@
 #include <bootdata/bootdata.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-static u32 g_boot_device = SMP_BOOT_UNKNOWN;
 #define BOOT_COUNTER_LIMIT		BOOT_COUNT_LIMIT
 #define FORCE_BOOT_RESCUE_DELAY 5000
 
@@ -51,6 +50,7 @@ static iomux_v3_cfg_t const id_pads[] = {
 int get_board_id(void)
 {
 	static int board_id = UNKNOWN_BOARD;
+	board_id = DART_MX8M_MINI;
 
 	if (board_id != UNKNOWN_BOARD)
 		return board_id;
@@ -67,6 +67,7 @@ int get_board_id(void)
 int get_board_id(void)
 {
 	static int board_id = UNKNOWN_BOARD;
+	board_id = DART_MX8M_MINI;
 
 	if (board_id != UNKNOWN_BOARD)
 		return board_id;
@@ -79,32 +80,6 @@ int get_board_id(void)
 		board_id = UNKNOWN_BOARD;
 
 	return board_id;
-}
-
-int set_boot_device(void)
-{
-	g_boot_device = smp_get_current_mmc_device();
-
-	switch (g_boot_device)
-	{
-		case 1:
-			printf("Booting from: MMC1 - SD CARD \n");
-			env_set("boot_source", "MMC1");
-			g_boot_device = SMP_BOOT_SD_CARD;
-		break;
-		case 2:
-			printf("Booting from: MMC2 - INTERNAL EMMC\n");
-			env_set("boot_source", "MMC2");
-			g_boot_device = SMP_BOOT_INTERNAL_EMMC;
-		break;
-		default:
-			printf("Booting from: unknown: %08x\ngd: %p\n", g_boot_device, gd);
-			env_set("boot_source", "0");
-			g_boot_device = SMP_BOOT_UNKNOWN;
-		break;
-	}
-
-	return 0;
 }
 
 #endif
@@ -128,10 +103,18 @@ int var_get_som_rev(struct var_eeprom *ep)
 #define UART_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1)
 #define WDOG_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_ODE | PAD_CTL_PUE | PAD_CTL_PE)
 
+#if 0
 static iomux_v3_cfg_t const uart1_pads[] = {
 	IMX8MM_PAD_UART1_RXD_UART1_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
 	IMX8MM_PAD_UART1_TXD_UART1_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
 };
+#else
+static iomux_v3_cfg_t const uart1_pads[] = {
+	IMX8MM_PAD_SAI2_RXC_UART1_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	IMX8MM_PAD_SAI2_RXFS_UART1_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+#endif
+
 
 static iomux_v3_cfg_t const uart4_pads[] = {
 	IMX8MM_PAD_UART4_RXD_UART4_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
@@ -303,7 +286,6 @@ int board_late_init(void)
 #endif
 
 	struct eaton_boot_data_struct boot_data = {0};
-	unsigned long boot_count;
 	char boot_count_str[5];
 	int rc = 0;
 
@@ -350,73 +332,111 @@ int board_late_init(void)
 	board_late_mmc_env_init();
 #endif
 
-	set_boot_device();
+	env_set_ulong("bootmmcdev", mmc_get_env_dev());
 
-	if(g_boot_device == SMP_BOOT_INTERNAL_EMMC)
+	rc = bootdata_read(&boot_data);
+	if (rc != 0)
 	{
-		rc = bootdata_read(&boot_data);
-		if (rc != 0)
-		{
-			printf("Error reading bootdata.bin\n");
-			memset(&boot_data, 0, sizeof(boot_data));
-		}
+		printf("Error reading bootdata.bin\n");
+		memset(&boot_data, 0, sizeof(boot_data));
+	}
 
-		boot_count = boot_data.boot_count;
-
-		//TODO Power fail wi
-		// if (genepi_read_pflatch())
-		// {
-		// 	env_set("power_fail", "1");
-		// 	while (read_pflatch_count < 3 && genepi_read_pflatch()) {
-		// 		if (genepi_clear_pflatch() < 0) {
-		// 			printf("error while clearing the pflatch\n");
-		// 			return -1;
-		// 		}
-
-		// 		read_pflatch_count++;
-		// 	}
-		// }
-		// else
-		// {
-				boot_count++;
-		// }
-
-		sprintf(boot_count_str, "%d", boot_count);
-		env_set("bootcounter", boot_count_str);
-		sprintf(boot_count_str, "%d", BOOT_COUNTER_LIMIT);
-		env_set("bootcounterlimit", boot_count_str);
-
-
-	//TODO Force rescue wi
-	// if (g_boot_device == BOOT_DEVICE_SPI && boot_count < BOOT_COUNTER_LIMIT) {
-	// 	printf("Press the front panel button to force rescue mode in %d seconds", FORCE_BOOT_RESCUE_DELAY / 1000);
-	// 	timer_start = get_timer(0);
-	// 	timer_delay_print = 0;
-	// 	while ((timer_delay = get_timer(timer_start)) < FORCE_BOOT_RESCUE_DELAY) {
-	// 		/*
-	// 		 * The GPIO is active low and we want to stop looping as soon as it is activated.
-	// 		 */
-	// 		front_button_value = genepi_read_front_button();
-	// 		if(front_button_value == 0)
-	// 			break;
-
-	// 		if (timer_delay >= timer_delay_print) {
-	// 			timer_delay_print += 1000;
-	// 			printf(".");
+	//TODO Power fail wi
+	// if (genepi_read_pflatch())
+	// {
+	// 	env_set("power_fail", "1");
+	// 	while (read_pflatch_count < 3 && genepi_read_pflatch()) {
+	// 		if (genepi_clear_pflatch() < 0) {
+	// 			printf("error while clearing the pflatch\n");
+	// 			return -1;
 	// 		}
+
+	// 		read_pflatch_count++;
 	// 	}
-	// 	printf("\n");
+	// }
+	// else
+	// {
+			boot_data.boot_count++;
 	// }
 
-	// env_set("force_rescue", front_button_value == 1 ? "0" : "1");
-
-	}
+	sprintf(boot_count_str, "%d", boot_data.boot_count);
+	env_set("bootcounter", boot_count_str);
+	sprintf(boot_count_str, "%d", BOOT_COUNTER_LIMIT);
+	env_set("bootcounterlimit", boot_count_str);
 
 	return 0;
 }
 
 #ifndef CONFIG_SPL_BUILD
-int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+
+/**
+ *  Returns 1 if GPIO1_0 value is 1 (high), returns 0 otherwise
+ **/
+static int smp_read_front_button(void)
+{
+	int ret;
+	struct udevice *dev = NULL;
+	char buf[80];
+
+	//TODO Force rescue wi 
+
+	// Search and Check do_gpio_status for how to read GPIO1_0
+
+	return 1;
+}
+
+
+int do_check_force_rescue(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	int front_button_value = 1;
+	char *delay_str = NULL;
+	int delay = FORCE_BOOT_RESCUE_DELAY;
+
+	if (argc >= 2)
+		delay_str = argv[1];
+
+	if (!delay_str)
+		delay_str = env_get("forcerescue_delay");
+
+	if (delay_str)
+		delay = (int)simple_strtol(delay_str, NULL, 10);
+
+	if (delay > 0)
+		printf("Press the front panel button to force rescue mode in %d seconds", delay);
+
+	unsigned long timer_start = get_timer(0);
+	unsigned long timer_delay_print = 0;
+	unsigned long timer_delay = 0;
+	do
+	{
+		/*
+			* The GPIO is active low and we want to stop looping as soon as it is activated.
+		*/
+		front_button_value = smp_read_front_button();
+		if (front_button_value == 0)
+			break;
+
+		if (timer_delay >= timer_delay_print)
+		{
+			timer_delay_print += 1000;
+			if (delay > 0)
+				printf(".");
+		}
+	}
+	while ((timer_delay = get_timer(timer_start)) < (delay * 1000));
+
+	if (delay > 0)
+		printf("\n");
+
+	return env_set("force_rescue", front_button_value != 0 ? "0" : "1");
+}
+
+U_BOOT_CMD(check_force_rescue, 2, 0, do_check_force_rescue,
+			"Check if the force-rescue button is pressed before it timeout.\n",
+			"timeout\n The timeout in seconds.");
+
+
+int do_save_boot_data(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct eaton_boot_data_struct boot_data = {0};
 	int rc = -1;
@@ -427,29 +447,26 @@ int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return -1;
 	}
 
-	if (g_boot_device == SMP_BOOT_INTERNAL_EMMC)
+	rc = bootdata_read(&boot_data);
+	if (rc != 0)
 	{
-		rc = bootdata_read(&boot_data);
-		if (rc != 0)
-		{
-			printf("Error reading bootdata.bin\n");
-			memset(&boot_data, 0, sizeof(boot_data));
-		}
+		printf("Error reading bootdata.bin\n");
+		memset(&boot_data, 0, sizeof(boot_data));
+	}
 
-		boot_data.boot_count = (u8)simple_strtoul(argv[1], NULL, 10);
+	boot_data.boot_count = (u8)simple_strtoul(argv[1], NULL, 10);
 
-		rc = bootdata_write(&boot_data);
-		if (rc != 0)
-		{
-			printf("Error writing bootdata.bin\n");
-			memset(&boot_data, 0, sizeof(boot_data));
-		}
+	rc = bootdata_write(&boot_data);
+	if (rc != 0)
+	{
+		printf("Error writing bootdata.bin\n");
+		memset(&boot_data, 0, sizeof(boot_data));
 	}
 
 	return rc;
 }
 
-U_BOOT_CMD(save_boot_data, 3, 0, do_save_boot_data,
-			"save_boot_data - Save the bootstruct to emmc memory. \n",
-			"save_boot_data boot_count boot_limit reset_flag\n The maximum value is 0xff or 255");
+U_BOOT_CMD(save_boot_data, 2, 0, do_save_boot_data,
+			"Save the bootstruct to emmc memory.",
+			"counter\n The maximum value is 0xff or 255");
 #endif
