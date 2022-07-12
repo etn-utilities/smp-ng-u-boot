@@ -133,13 +133,16 @@
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"${kernelargs} " \
-		"root=${mmcroot} rootwait rw ${cma_size}" \
+		"${cma_size} " \
+		"root=${mmcroot} rootwait rw " \
 		"rootfstype=${mmcrootfstype} " \
 		"boot_type=${boot_type} " \
+		KERNEL_EXTRA_ARGS \
 		"\0" \
 	"emmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"${kernelargs} " \
+		"${cma_size} " \
 		"boot_type=${boot_type} " \
 		"boot_cause=${boot_cause} " \
 		"power_fail=${power_fail} " \
