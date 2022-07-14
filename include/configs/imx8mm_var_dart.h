@@ -159,10 +159,6 @@
 			"dcache flush; " \
 		"fi; " \
 		"bootaux ${m4_addr};\0" \
-	"loadimage=load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image};" \
-		"unzip ${img_addr} ${loadaddr}\0" \
-	"loadfdt=echo fdt_file=${fdt_file}; " \
-		"load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}\0" \
 	"ramsize_check="\
 		"if test $sdram_size -le 512; then " \
 			"setenv cma_size cma=320M; " \
@@ -170,21 +166,29 @@
 			"setenv cma_size cma=640M@1376M; " \
 		"fi;\0" \
 	"mmcboot=echo Booting from MMC${mmcdev} ...; " \
-		"mmc dev ${mmcdev}; " \
-		"if run loadimage; then " \
-			"run mmcargs; " \
-			"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
-				"if run loadfdt; then " \
+		"mmc dev ${mmcdev}; " \		
+		"if test -e mmc ${mmcdev} ${bootdir}/${image}; then " \
+			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image}; then " \
+				"unzip ${img_addr} ${loadaddr}; " \
+				"if load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}; then " \
+					"run mmcargs; " \
 					"booti ${loadaddr} - ${fdt_addr}; " \
 				"else " \
-					"echo WARN: Cannot load the DT; " \
+					"echo Failed to load ${bootdir}/${fdt_file}; " \
 				"fi; " \
 			"else " \
-				"echo wait for boot; " \
+				" echo Failed to load ${bootdir}/${image}; " \
+			"fi; " \
+		"elif test -e mmc ${mmcdev} ${bootdir}/fitImage; then " \
+			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/fitImage; then " \
+				"run mmcargs; " \
+				"bootm ${img_addr}; " \
+			"else " \
+				"echo Failed to load ${bootdir}/fitImage; " \
 			"fi; " \
 		"else " \
-			"echo Failed to load image from MMC${mmcdev}; " \
-		"fi;\0" \
+			"echo Failed to load image from MMC${mmcdev} (no kernel found); " \
+		"fi;\0" \		
 	"emmcboot2= " \
 		"if test -e mmc ${emmcdev}:${part_system} /boot/${boot_type}/kernel.bin; then " \
 			"load mmc ${emmcdev}:${part_system} ${img_addr} /boot/${boot_type}/kernel.bin; " \
