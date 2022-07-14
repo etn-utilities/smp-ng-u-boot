@@ -106,6 +106,8 @@
 
 #endif
 
+// TODO (Joleme): https://community.nxp.com/t5/i-MX-Processors/fitImage-loadaddress-and-entrypoint-for-imx8mn-evk/m-p/1226093#M168922
+//https://patchwork.ozlabs.org/project/uboot/patch/20220429133444.419224-1-sr@denx.de/#2908619
 
 /* Initial environment variables */
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -129,7 +131,7 @@
 	"mmcblk=1\0" \
 	"mmcpart=1\0" \
 	"mmcautodetect=no\0" \
-	"mmcroot=/dev/mmcblk${mmcblk}p${mmcpart}\0" \
+	"mmcroot=/dev/mmcblk1p1\0" \
 	"mmcrootfstype=ext4\0" \
 	"emmcdev=2\0" \
 	"part_store=2\0" \
@@ -147,13 +149,16 @@
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"${kernelargs} " \
-		"root=${mmcroot} rootwait rw ${cma_size}" \
+		"${cma_size} " \
+		"root=${mmcroot} rootwait rw " \
 		"rootfstype=${mmcrootfstype} " \
 		"boot_type=${boot_type} " \
+		KERNEL_EXTRA_ARGS \
 		"\0" \
 	"emmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"${kernelargs} " \
+		"${cma_size} " \
 		"boot_type=${boot_type} " \
 		"boot_cause=${boot_cause} " \
 		"power_fail=${power_fail} " \
@@ -172,16 +177,6 @@
 			"dcache flush; " \
 		"fi; " \
 		"bootaux ${m4_addr};\0" \
-	"optargs=setenv bootargs ${bootargs} ${kernelargs};\0" \
-	"mmcargs=setenv bootargs console=${console} " \
-		"root=/dev/mmcblk${mmcblk}p${mmcpart} rootwait rw ${cma_size} cma_name=linux,cma\0 " \
-	"loadbootscript=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${bsp_script};\0" \
-	"bootscript=echo Running bootscript from mmc ...; " \
-		"source\0" \
-	"loadimage=load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image};" \
-		"unzip ${img_addr} ${loadaddr}\0" \
-	"loadfdt=echo fdt_file=${fdt_file}; " \
-		"load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}\0" \
 	"ramsize_check="\
 		"if test $sdram_size -le 512; then " \
 			"setenv cma_size cma=320M; " \
@@ -194,19 +189,27 @@
 		"fi;\0" \
 	"mmcboot=echo Booting from MMC${mmcdev} ...; " \
 		"mmc dev ${mmcdev}; " \
-		"if run loadimage; then " \
-			"run mmcargs; " \
-			"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
-				"if run loadfdt; then " \
+		"if test -e mmc ${mmcdev} ${bootdir}/${image}; then " \
+			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image}; then " \
+				"unzip ${img_addr} ${loadaddr}; " \
+				"if load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}; then " \
+					"run mmcargs; " \
 					"booti ${loadaddr} - ${fdt_addr}; " \
 				"else " \
-					"echo WARN: Cannot load the DT; " \
+					"echo Failed to load ${bootdir}/${fdt_file}; " \
 				"fi; " \
 			"else " \
-				"echo wait for boot; " \
+				" echo Failed to load ${bootdir}/${image}; " \
+			"fi; " \
+		"elif test -e mmc ${mmcdev} ${bootdir}/fitImage; then " \
+			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/fitImage; then " \
+				"run mmcargs; " \
+				"bootm ${img_addr}; " \
+			"else " \
+				"echo Failed to load ${bootdir}/fitImage; " \
 			"fi; " \
 		"else " \
-			"echo Failed to load image from MMC${mmcdev}; " \
+			"echo Failed to load image from MMC${mmcdev} (no kernel found); " \
 		"fi;\0" \
 	"emmcboot2= " \
 		"if test -e mmc ${emmcdev}:${part_system} /boot/${boot_type}/kernel.bin; then " \
