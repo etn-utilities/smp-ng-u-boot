@@ -375,14 +375,25 @@ int board_late_init(void)
 static int smp_read_front_button(void)
 {
 	int ret;
+	int val = 0;
 	struct udevice *dev = NULL;
-	char buf[80];
+	
+	for (ret = uclass_first_device(UCLASS_GPIO, &dev);
+	     dev;
+	     ret = uclass_next_device(&dev)) {
+		const char *bank_name;
+		int num_bits;
+		int banklen;
+		bank_name = gpio_get_bank_info(dev, &num_bits);
+		banklen = bank_name ? strlen(bank_name) : 0;
+		if(!strncasecmp("GPIO1_", bank_name, banklen)) {
+			struct dm_gpio_ops *ops = gpio_get_ops(dev);
+			val = ops->get_value(dev, 0);
+			break;
+		}
+	}
 
-	//TODO Force rescue wi 
-
-	// Search and Check do_gpio_status for how to read GPIO1_0
-
-	return 1;
+	return val;
 }
 
 
