@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
+#include <linux/delay.h>
 #include <common.h>
 #include <env.h>
 #include <asm/io.h>
@@ -30,13 +30,23 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 #define BOOT_COUNTER_LIMIT		BOOT_COUNT_LIMIT
-#define FORCE_BOOT_RESCUE_DELAY 5000
+#define FORCE_BOOT_RESCUE_DELAY 5
+
+#define LATCH_GPIO_BANK				4
+#define LATCH_GPIO_OFFSET			1
+#define POWER_FAIL_GPIO_BANK		1
+#define POWER_FAIL_GPIO_OFFSET		11
+#define FRONT_BUTTON_GPIO_BANK		1
+#define FRONT_BUTTON_GPIO_OFFSET	0
 
 #define BOOTDATA_IFACE		"mmc"
 #define BOOTDATA_PART		"2:2"
 #define BOOTDATA_FILENAME 	"/bootdata.bin"
 
 extern int var_setup_mac(struct var_eeprom *eeprom);
+
+static int smp_read_gpio_value(int bank_number, int offset);
+static int smp_set_gpio_value(int bank_number, int offset, int value);
 
 #define GPIO_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1 | PAD_CTL_PUE | PAD_CTL_PE)
 
@@ -289,6 +299,8 @@ int board_late_init(void)
 	char boot_count_str[5];
 	int rc = 0;
 
+	int read_pflatch_count = 0;
+
 #ifdef CONFIG_FEC_MXC
 	var_setup_mac(ep);
 #endif
@@ -341,23 +353,23 @@ int board_late_init(void)
 		memset(&boot_data, 0, sizeof(boot_data));
 	}
 
-	//TODO Power fail wi
-	// if (genepi_read_pflatch())
-	// {
-	// 	env_set("power_fail", "1");
-	// 	while (read_pflatch_count < 3 && genepi_read_pflatch()) {
-	// 		if (genepi_clear_pflatch() < 0) {
-	// 			printf("error while clearing the pflatch\n");
-	// 			return -1;
-	// 		}
-
-	// 		read_pflatch_count++;
-	// 	}
-	// }
-	// else
-	// {
-			boot_data.boot_count++;
-	// }
+	if (smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET))
+	{
+		env_set("power_fail", "1");
+		while (read_pflatch_count < 3 && smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET))
+		{
+			if (smp_set_gpio_value(LATCH_GPIO_BANK, LATCH_GPIO_OFFSET, 1))
+			{
+				return -1;
+			}
+			udelay(1000);
+			read_pflatch_count++;
+		}
+	}
+	else
+	{
+		boot_data.boot_count++;
+	}
 
 	sprintf(boot_count_str, "%d", boot_data.boot_count);
 	env_set("bootcounter", boot_count_str);
@@ -370,13 +382,14 @@ int board_late_init(void)
 #ifndef CONFIG_SPL_BUILD
 
 /**
- *  Returns 1 if GPIO1_0 value is 1 (high), returns 0 otherwise
+ *  Returns 1 if the GPIO value is 1 (high), returns 0 otherwise
  **/
-static int smp_read_front_button(void)
+static int smp_read_gpio_value(int bank_number, int offset)
 {
 	int ret;
 	int val = 0;
 	struct udevice *dev = NULL;
+	char buf[80];
 	
 	for (ret = uclass_first_device(UCLASS_GPIO, &dev);
 	     dev;
@@ -386,14 +399,46 @@ static int smp_read_front_button(void)
 		int banklen;
 		bank_name = gpio_get_bank_info(dev, &num_bits);
 		banklen = bank_name ? strlen(bank_name) : 0;
-		if(!strncasecmp("GPIO1_", bank_name, banklen)) {
+		snprintf(buf, sizeof(buf), "GPIO%d_", bank_number);
+		if(!strncasecmp(buf, bank_name, banklen)) {
 			struct dm_gpio_ops *ops = gpio_get_ops(dev);
-			val = ops->get_value(dev, 0);
+			val = ops->get_value(dev, offset);
 			break;
 		}
 	}
 
 	return val;
+}
+
+/**
+ *  Changes value of the GPIO, returns -1 in case of error otherwise returns 0;
+ **/
+static int smp_set_gpio_value(int bank_number, int offset, int value)
+{
+	int ret;
+	struct udevice *dev = NULL;
+	char buf[80];
+
+	for (ret = uclass_first_device(UCLASS_GPIO, &dev);
+	     dev;
+	     ret = uclass_next_device(&dev)) {
+		const char *bank_name;
+		int num_bits;
+		int banklen;
+		bank_name = gpio_get_bank_info(dev, &num_bits);
+		banklen = bank_name ? strlen(bank_name) : 0;
+		snprintf(buf, sizeof(buf), "GPIO%d_", bank_number);
+		if(!strncasecmp(buf, bank_name, banklen)) {
+			struct dm_gpio_ops *ops = gpio_get_ops(dev);
+			if(ops->direction_output(dev, offset, value) || ops->set_value(dev, offset, value))
+			{
+				return -1;
+			}
+			break;
+		}
+	}
+
+	return 0;
 }
 
 
@@ -423,7 +468,7 @@ int do_check_force_rescue(struct cmd_tbl *cmdtp, int flag, int argc, char * cons
 		/*
 			* The GPIO is active low and we want to stop looping as soon as it is activated.
 		*/
-		front_button_value = smp_read_front_button();
+		front_button_value = smp_read_gpio_value(FRONT_BUTTON_GPIO_BANK, FRONT_BUTTON_GPIO_OFFSET);
 		if (front_button_value == 0)
 			break;
 
