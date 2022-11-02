@@ -421,9 +421,9 @@ static int imx_tmu_parse_fdt(struct udevice *dev)
 		if (!type)
 			continue;
 		if (!strcmp(type, "critical"))
-			pdata->critical = ofnode_read_u32_default(trips_np, "temperature", 85);
+			pdata->critical = ofnode_read_u32_default(trips_np, "temperature", 105);
 		else if (strcmp(type, "passive") == 0)
-			pdata->alert = ofnode_read_u32_default(trips_np, "temperature", 80);
+			pdata->alert = ofnode_read_u32_default(trips_np, "temperature", 101);
 		else
 			continue;
 	}
