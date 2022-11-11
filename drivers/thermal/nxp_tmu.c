@@ -421,7 +421,7 @@ static int nxp_tmu_parse_fdt(struct udevice *dev)
 			if (strcmp(type, "critical") == 0)
 				pdata->critical = fdtdec_get_int(gd->fdt_blob, trips_np, "temperature", 105);
 			else if (strcmp(type, "passive") == 0)
-				pdata->alert = fdtdec_get_int(gd->fdt_blob, trips_np, "temperature", 95);
+				pdata->alert = fdtdec_get_int(gd->fdt_blob, trips_np, "temperature", 101);
 		}
 	}
 

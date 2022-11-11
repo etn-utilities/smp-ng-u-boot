@@ -328,7 +328,7 @@
 			thermal-sensors = <&tmu>;
 			trips {
 				cpu_alert0: trip0 {
-					temperature = <95000>;
+					temperature = <101000>;
 					hysteresis = <2000>;
 					type = "passive";
 				};
