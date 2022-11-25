@@ -298,7 +298,8 @@ int board_late_init(void)
 	struct eaton_boot_data_struct boot_data = {0};
 	char boot_count_str[5];
 	int rc = 0;
-
+	u32 boot_cause;
+	char boot_cause_str[11];
 	int read_pflatch_count = 0;
 
 #ifdef CONFIG_FEC_MXC
@@ -375,6 +376,11 @@ int board_late_init(void)
 	env_set("bootcounter", boot_count_str);
 	sprintf(boot_count_str, "%d", BOOT_COUNTER_LIMIT);
 	env_set("bootcounterlimit", boot_count_str);
+	
+	boot_cause = get_imx_reset_cause();
+	sprintf(boot_cause_str, "%09x", boot_cause); //we only want the 9 LSBs - bits 10-31 are reserved
+	env_set("boot_cause", boot_cause_str);
+
 
 	return 0;
 }
