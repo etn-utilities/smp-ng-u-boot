@@ -106,25 +106,29 @@
 
 #endif
 
-// TODO (Joleme): https://community.nxp.com/t5/i-MX-Processors/fitImage-loadaddress-and-entrypoint-for-imx8mn-evk/m-p/1226093#M168922
-//https://patchwork.ozlabs.org/project/uboot/patch/20220429133444.419224-1-sr@denx.de/#2908619
-
 /* Initial environment variables */
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	CONFIG_MFG_ENV_SETTINGS \
 	SMP_EXTRA_ENV_SETTINGS \
-	"bootdir=/boot\0"	\
+    "bootdir=/boot\0" \
+	"console=ttymxc0,115200\0" \
 	"script=boot.scr\0" \
-	"scriptaddr=0x43500000\0" \
-	"kernel_addr_r=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+    \  
+	"scriptaddr="__stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+    \
+	"kernel_addr_r="__stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+    \
 	"bsp_script=boot.scr\0" \
 	"image=Image.gz\0" \
-	"img_addr=0x42000000\0"			\
-	"console=ttymxc0,115200\0" \
-	"fdt_addr_r=0x43000000\0" \
-	"fdt_addr=0x43000000\0" \
+    \
+	"img_addr="__stringify(CONFIG_IMAGE_LOAD_ADDR)"\0" \
+    \
+	"fdt_addr="__stringify(CONFIG_FDT_LOAD_ADDR)"\0" \
+	"fdt_addr_r="__stringify(CONFIG_FDT_LOAD_ADDR)"\0" \
+    \
 	"fdt_high=0xffffffffffffffff\0" \
 	"boot_fdt=try\0" \
+	"boot_fit=no\0" \
 	"fdt_file=imx8mm-var-dart-da3050.dtb\0" \
 	"ip_dyn=yes\0" \
 	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)"\0" \
@@ -278,11 +282,11 @@
 		"echo Failed to MMC rescan; " \
 	"fi;"
 
-
 /* Link Definitions */
-#define CONFIG_LOADADDR			0x40480000
-
-#define CONFIG_SYS_LOAD_ADDR		CONFIG_LOADADDR
+#define CONFIG_LOADADDR             0x40600000
+#define CONFIG_SYS_LOAD_ADDR        CONFIG_LOADADDR
+#define CONFIG_IMAGE_LOAD_ADDR      0x46000000
+#define CONFIG_FDT_LOAD_ADDR        0x48000000
 
 #define CONFIG_SYS_INIT_RAM_ADDR        0x40000000
 #define CONFIG_SYS_INIT_RAM_SIZE        0x200000
