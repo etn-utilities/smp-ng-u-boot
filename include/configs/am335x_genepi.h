@@ -193,7 +193,13 @@
 			"save_boot_data ${bootcounterlimit} ${resetflag}; " \
 			"echo Booting in rescue mode (counter=${bootcounter}); " \
 			"setenv boot_type ses; " \
-			"setenv force_rescue 2; " \
+			"if test ${bootcounter} -eq 128; then " \
+				"setenv force_rescue 4; " \
+			"elif test ${bootcounter} -eq 129; then " \
+				"setenv force_rescue 5; " \
+			"else " \
+				"setenv force_rescue 2; " \
+			"fi; " \
 		"elif test -e ubi system /boot/diag/kernel.bin || test -e ubi system /boot/diag/fitImage-initramfs-io2200-io2200.bin ; then " \
 			"save_boot_data ${bootcounter} ${resetflag}; " \
 			"echo Booting in diagnostics mode; " \

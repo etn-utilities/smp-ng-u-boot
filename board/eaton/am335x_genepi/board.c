@@ -471,7 +471,10 @@ int board_late_init(void)
 	}
 	else
 	{
-		boot_count++;
+		if (boot_count < BOOT_COUNTER_LIMIT)
+		{
+			boot_count++;
+		}
 	}
 
 	sprintf(boot_count_str, "%d", boot_count);
