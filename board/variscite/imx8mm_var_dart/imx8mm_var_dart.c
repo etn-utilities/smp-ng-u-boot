@@ -337,7 +337,10 @@ int board_late_init(void)
 	}
 	else
 	{
-		boot_data.boot_count++;
+		if (boot_data.boot_count < BOOT_COUNTER_LIMIT)
+		{
+			boot_data.boot_count++;
+		}
 	}
 
 	sprintf(boot_count_str, "%d", boot_data.boot_count);
