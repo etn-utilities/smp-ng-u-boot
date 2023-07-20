@@ -257,6 +257,8 @@ static int bootdata_write(const struct eaton_boot_data_struct *boot_data)
 	return 0;
 }
 
+extern void hab_late_init(bool fuse_device, bool close_device, bool check_boot, bool field_return, bool reset_after, uint8_t extra_cmds);
+
 #define SDRAM_SIZE_STR_LEN 5
 int board_late_init(void)
 {
@@ -323,12 +325,66 @@ int board_late_init(void)
 
 	env_set_ulong("bootmmcdev", mmc_get_env_dev());
 
+// The following code was included into the SPL increasing the size unintentionally
+#ifndef CONFIG_SPL_BUILD
 	rc = bootdata_read(&boot_data);
 	if (rc != 0)
 	{
 		printf("Error reading bootdata.bin\n");
 		memset(&boot_data, 0, sizeof(boot_data));
 	}
+
+    uint8_t prod_close_sequence = 0;
+	bool fuse_device  = false;
+	bool close_device = false;
+	bool check_boot  = false;
+	bool field_return = false;
+	bool reset_after = false;
+	uint8_t extra_cmds = 0;
+
+    fuse_device         = boot_data.fuse_device_flag  ? true : false;
+	close_device        = boot_data.close_device_flag ? true : false;
+	check_boot          = boot_data.check_boot_flag   ? true : false;
+	field_return        = boot_data.field_return_flag ? true : false;
+	prod_close_sequence = boot_data.prod_close_sequence;
+	extra_cmds          = boot_data.extra_cmds;
+
+	
+	// Sanity check.
+	if (prod_close_sequence > 2) {
+		prod_close_sequence = 2;
+	}
+
+	if (fuse_device || close_device || check_boot || field_return || prod_close_sequence || extra_cmds) {
+		uint8_t seq = prod_close_sequence;
+
+		if (seq) seq--;
+	    boot_data.fuse_device_flag    = 0;
+		boot_data.close_device_flag   = 0;
+		boot_data.check_boot_flag     = 0;
+		boot_data.field_return        = 0;
+		boot_data.prod_close_sequence = seq;
+		oot_data.extra_cmds           = 0;
+	    rc = bootdata_write(&boot_data);
+	}
+
+	if (prod_close_sequence == 2) {
+		fuse_device  = true;
+		close_device = false;
+		field_return = false;
+		check_boot   = false;
+		reset_after  = true;
+		extra_cmds   = 0;
+	}	
+	else if (prod_close_sequence == 1) {
+		fuse_device  = false;
+		close_device = true;
+		field_return = false;
+		check_boot   = false;
+		reset_after  = false;
+		extra_cmds   = 0;
+	}	
+
 
 	if (smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET))
 	{
@@ -360,6 +416,9 @@ int board_late_init(void)
 	sprintf(boot_cause_str, "%09x", boot_cause); //we only want the 9 LSBs - bits 10-31 are reserved
 	env_set("boot_cause", boot_cause_str);
 
+
+    hab_late_init(fuse_device, close_device, check_boot, field_return, reset_after, extra_cmds);
+#endif	
 
 	return 0;
 }

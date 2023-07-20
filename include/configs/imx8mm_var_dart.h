@@ -113,7 +113,7 @@
     "bootdir=/boot\0" \
 	"console=ttymxc0,115200\0" \
 	"script=boot.scr\0" \
-    \  
+    \
 	"scriptaddr="__stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
     \
 	"kernel_addr_r="__stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
@@ -169,6 +169,18 @@
 		"boot_cause=${boot_cause} " \
 		"power_fail=${power_fail} " \
 		"force_rescue=${force_rescue} " \
+		"hab_device_closed=${hab_device_closed} " \
+		"hab_device_field_return=${hab_device_field_return} " \
+		"hab_device_field_return_locked=${hab_device_field_return_locked} " \
+		"hab_device_revocation_bits=${hab_device_revocation_bits} " \
+		"hab_fuse_programmed=${hab_fuse_programmed} " \
+		"hab_fuse_content_correct=${hab_fuse_content_correct} " \
+		"hab_uboot_sig_valid=${hab_uboot_sig_valid} " \
+		"hab_boot_check_cmd_result=${hab_boot_check_cmd_result} " \
+		"hab_fuse_prog_cmd_result=${hab_fuse_prog_cmd_result} " \
+		"hab_device_close_cmd_result=${hab_device_close_cmd_result} " \
+		"hab_device_field_return_cmd_result=${hab_device_field_return_cmd_result} " \
+		"is_dev_board=${is_dev_board} " \
 		KERNEL_EXTRA_ARGS \
 		"\0" \
 	"loadm4bin=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${m4_bin}; " \
@@ -267,7 +279,10 @@
 		"echo Failed to start the rescue; " \
 		"sleep 5; " \
 		"reset; " \
-		"\0" \
+		"\0"
+#ifdef CONFIG_BOOTCOMMAND
+#undef CONFIG_BOOTCOMMAND
+#endif
 
 #define CONFIG_BOOTCOMMAND \
 	"if mmc dev ${bootmmcdev} && mmc rescan; then " \
@@ -298,6 +313,9 @@
 
 /* Link Definitions */
 #define CONFIG_LOADADDR             0x40600000
+#ifdef CONFIG_SYS_LOAD_ADDR
+#undef CONFIG_SYS_LOAD_ADDR
+#endif
 #define CONFIG_SYS_LOAD_ADDR        CONFIG_LOADADDR
 #define CONFIG_IMAGE_LOAD_ADDR      0x46000000
 #define CONFIG_FDT_LOAD_ADDR        0x48000000
