@@ -39,6 +39,10 @@
 
 #define CONFIG_REMAKE_ELF
 
+#ifndef KERNEL_EXTRA_ARGS
+#define KERNEL_EXTRA_ARGS ""
+#endif
+
 /* ENET Config */
 #if defined(CONFIG_FEC_MXC)
 #define CONFIG_ETHPRIME                 "FEC"
@@ -70,32 +74,99 @@
 	"emmc_dev=2\0"\
 	"sd_dev=1\0" \
 
+#if !defined(SMP_OFFICIAL_VERSION) || SMP_OFFICIAL_VERSION != 0
+#define SMP_EXTRA_ENV_SETTINGS \
+	"smp_official=1\0" \
+	"try_boot_mmc1=no\0" \
+	"try_boot_mmc2=no\0" \
+	"bootdelay=-2\0" \
+
+#else
+#define SMP_EXTRA_ENV_SETTINGS \
+	"smp_official=0\0" \
+	"try_boot_mmc1=yes\0" \
+	"try_boot_mmc2=yes\0" \
+	"bootdelay=3\0" \
+	"forcerescue_delay=1\0" \
+	"erase_mmc2=ask confirm_erase_mmc2 'Enter FORMAT to erase the EMMC:' 6; if env exists confirm_erase_mmc2 && test ${confirm_erase_mmc2} = FORMAT ; then mmc dev 2; mmc erase 0 20480; sleep 5; reset ; fi\0" \
+	"boot_cmd_3=setenv force_rescue 0; setenv bootcounter 0; run emmcboot\0" \
+	"boot_cmd_4=setenv force_rescue 1; run emmcboot\0" \
+	"boot_cmd_5=run erase_mmc2; bootmenu -1\0" \
+	"bootmenu_0=Boot (default)=boot\0" \
+	"bootmenu_1=Boot from SD Card=run mmcboot\0" \
+	"bootmenu_2=Boot from EMMC=run emmcboot\0" \
+	"bootmenu_3=Boot from EMMC (primary)=run boot_cmd_3\0" \
+	"bootmenu_4=Boot from EMMC (rescue)=run boot_cmd_4\0" \
+	"bootmenu_5=Erase EMMC=run boot_cmd_5\0" \
+	"bootmenu_6=Memory test=mtest\0" \
+	"bootmenu_7=Reboot=reset\0" \
+	"bootmenu_default=0\0" \
+	"bootmenu_show=1\0" \
+	"bootmenu_delay=10\0" \
+
+#endif
+
 /* Initial environment variables */
-#define CONFIG_EXTRA_ENV_SETTINGS		\
+#define CONFIG_EXTRA_ENV_SETTINGS \
 	CONFIG_MFG_ENV_SETTINGS \
-	"bootdir=/boot\0"	\
-	BOOTENV \
-	"scriptaddr=0x43500000\0" \
-	"kernel_addr_r=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+	SMP_EXTRA_ENV_SETTINGS \
+    "bootdir=/boot\0" \
+	"console=ttymxc0,115200\0" \
+	"script=boot.scr\0" \
+    \  
+	"scriptaddr="__stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+    \
+	"kernel_addr_r="__stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+    \
 	"bsp_script=boot.scr\0" \
 	"image=Image.gz\0" \
-	"img_addr=0x42000000\0"			\
-	"console=ttymxc0,115200\0" \
-	"fdt_addr_r=0x43000000\0" \
-	"fdt_addr=0x43000000\0"			\
-	"fdt_high=0xffffffffffffffff\0"		\
+    \
+	"img_addr="__stringify(CONFIG_IMAGE_LOAD_ADDR)"\0" \
+    \
+	"fdt_addr="__stringify(CONFIG_FDT_LOAD_ADDR)"\0" \
+	"fdt_addr_r="__stringify(CONFIG_FDT_LOAD_ADDR)"\0" \
+    \
+	"fdt_high=0xffffffffffffffff\0" \
 	"boot_fdt=try\0" \
 	"boot_fit=no\0" \
-	"fdt_file=undefined\0" \
+	"fdt_file=imx8mm-var-dart-da3050.dtb\0" \
 	"ip_dyn=yes\0" \
 	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)"\0" \
 	"mmcblk=1\0" \
 	"mmcpart=1\0" \
-	"mmcautodetect=yes\0" \
+	"mmcautodetect=no\0" \
+	"mmcroot=/dev/mmcblk1p1\0" \
+	"mmcrootfstype=ext4\0" \
+	"emmcdev=2\0" \
+	"part_store=2\0" \
+	"part_kexec=5\0" \
+	"part_system=7\0" \
 	"m4_addr=0x7e0000\0" \
 	"m4_bin=hello_world.bin\0" \
 	"use_m4=no\0" \
-	"dfu_alt_info=mmc 2=1 raw 0x42 0x1000 mmcpart\0" \
+	"optargs=panic=10 nohz=off\0" \
+	"bootcounter=0\0" \
+	"bootcounterlimit=4\0" \
+	"boot_type=sep\0" \
+	"force_rescue=0\0" \
+	"power_fail=0\0" \
+	"mmcargs=setenv bootargs console=${console} " \
+		"${optargs} " \
+		"${kernelargs} " \
+		"root=${mmcroot} rootwait rw " \
+		"rootfstype=${mmcrootfstype} " \
+		"boot_type=${boot_type} " \
+		KERNEL_EXTRA_ARGS \
+		"\0" \
+	"emmcargs=setenv bootargs console=${console} " \
+		"${optargs} " \
+		"${kernelargs} " \
+		"boot_type=${boot_type} " \
+		"boot_cause=${boot_cause} " \
+		"power_fail=${power_fail} " \
+		"force_rescue=${force_rescue} " \
+		KERNEL_EXTRA_ARGS \
+		"\0" \
 	"loadm4bin=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${m4_bin}; " \
 		"cp.b ${loadaddr} ${m4_addr} ${filesize}; " \
 		"echo Init rsc_table region memory; " \
@@ -108,94 +179,115 @@
 			"dcache flush; " \
 		"fi; " \
 		"bootaux ${m4_addr};\0" \
-	"optargs=setenv bootargs ${bootargs} ${kernelargs};\0" \
-	"mmcargs=setenv bootargs console=${console} " \
-		"root=/dev/mmcblk${mmcblk}p${mmcpart} rootwait rw ${cma_size} cma_name=linux,cma\0 " \
-	"loadbootscript=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${bsp_script};\0" \
-	"bootscript=echo Running bootscript from mmc ...; " \
-		"source\0" \
-	"loadimage=load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image};" \
-		"unzip ${img_addr} ${loadaddr}\0" \
-	"findfdt=" \
-		"if test $fdt_file = undefined; then " \
-			"if test $board_name = VAR-SOM-MX8M-MINI; then " \
-				"setenv fdt_file imx8mm-var-som-symphony.dtb; " \
-			"else " \
-				"if test $carrier_rev = legacy; then " \
-					"setenv fdt_file imx8mm-var-dart-dt8mcustomboard-legacy.dtb; " \
+	"mmcboot=echo Booting from MMC${mmcdev} ...; " \
+		"mmc dev ${mmcdev}; " \
+		"if test -e mmc ${mmcdev} ${bootdir}/${image}; then " \
+			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image}; then " \
+				"unzip ${img_addr} ${loadaddr}; " \
+				"if load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}; then " \
+					"run mmcargs; " \
+					"booti ${loadaddr} - ${fdt_addr}; " \
 				"else " \
-					"setenv fdt_file imx8mm-var-dart-dt8mcustomboard.dtb; " \
+					"echo Failed to load ${bootdir}/${fdt_file}; " \
 				"fi; " \
-			"fi; " \
-		"fi; \0" \
-	"loadfdt=run findfdt; " \
-		"echo fdt_file=${fdt_file}; " \
-		"load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}\0" \
-	"ramsize_check="\
-		"if test $sdram_size -le 512; then " \
-			"setenv cma_size cma=320M; " \
-		"else " \
-			"if test $sdram_size -le 1024; then " \
-				"setenv cma_size cma=576M; " \
 			"else " \
-				"setenv cma_size cma=640M; " \
+				" echo Failed to load ${bootdir}/${image}; " \
 			"fi; " \
-		"fi;\0" \
-	"mmcboot=echo Booting from mmc ...; " \
-		"run mmcargs; " \
-		"run optargs; " \
-		"if test ${boot_fit} = yes || test ${boot_fit} = try; then " \
-			"bootm ${loadaddr}; " \
-		"else " \
-			"if run loadfdt; then " \
-				"booti ${loadaddr} - ${fdt_addr_r}; " \
+		"elif test -e mmc ${mmcdev} ${bootdir}/fitImage; then " \
+			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/fitImage; then " \
+				"run mmcargs; " \
+				"bootm ${img_addr}; " \
 			"else " \
-				"echo WARN: Cannot load the DT; " \
+				"echo Failed to load ${bootdir}/fitImage; " \
 			"fi; " \
-		"fi;\0" \
-	"netargs=setenv bootargs console=${console} " \
-		"root=/dev/nfs ${cma_size} cma_name=linux,cma " \
-		"ip=dhcp nfsroot=${serverip}:${nfsroot},v3,tcp ${cma_size}\0" \
-	"netboot=echo Booting from net ...; " \
-		"run netargs;  " \
-		"run optargs;  " \
-		"if test ${ip_dyn} = yes; then " \
-			"setenv get_cmd dhcp; " \
 		"else " \
-			"setenv get_cmd tftp; " \
+			"echo Failed to load image from MMC${mmcdev} (no kernel found); " \
+		"fi;\0" \
+	"emmcboot2= " \
+		"if test -e mmc ${emmcdev}:${part_system} /boot/${boot_type}/kernel.bin; then " \
+			"load mmc ${emmcdev}:${part_system} ${img_addr} /boot/${boot_type}/kernel.bin; " \
+			"run emmcargs; " \
+			"bootm ${img_addr}; " \
+		"else " \
+			"echo No kernel found in /boot/${boot_type}; " \
 		"fi; " \
-		"${get_cmd} ${img_addr} ${image}; unzip ${img_addr} ${loadaddr};" \
-		"if test ${boot_fit} = yes || test ${boot_fit} = try; then " \
-			"bootm ${loadaddr}; " \
-		"else " \
-			"run findfdt; " \
-			"echo fdt_file=${fdt_file}; " \
-			"if ${get_cmd} ${fdt_addr} ${fdt_file}; then " \
-				"booti ${loadaddr} - ${fdt_addr_r}; " \
+		"\0" \
+	"emmcboot=echo Booting from MMC${emmcdev} ...; " \
+		"mmc dev ${emmcdev}; " \
+		"if test -e mmc ${emmcdev}:${part_kexec} /boot/kernel.bin; then " \
+			"load mmc ${emmcdev}:${part_kexec} ${img_addr} /boot/kernel.bin; " \
+			"run emmcargs; " \
+			"bootm ${img_addr}; " \
+		"elif test ${force_rescue} != 0; then " \
+			"save_boot_data ${bootcounterlimit}; " \
+			"echo Booting in rescue mode (button); " \
+			"setenv boot_type ses; " \
+			"setenv force_rescue 1; " \
+		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
+			"save_boot_data ${bootcounterlimit}; " \
+			"echo Booting in rescue mode (counter=${bootcounter}); " \
+			"setenv boot_type ses; " \
+			"if test ${bootcounter} -eq 128; then " \
+				"setenv force_rescue 4; " \
+			"elif test ${bootcounter} -eq 129; then " \
+				"setenv force_rescue 5; " \
 			"else " \
-				"echo WARN: Cannot load the DT; " \
+				"setenv force_rescue 2; " \
 			"fi; " \
-		"fi;\0" \
-	"bsp_bootcmd=echo Running BSP bootcmd ...; " \
-	"run ramsize_check; " \
-	"mmc dev ${mmcdev}; "\
-	"if mmc rescan; then " \
-		"if test ${use_m4} = yes && run loadm4bin; then " \
-			"run runm4bin; " \
-		"fi; " \
-		"if run loadbootscript; then " \
-			"run bootscript; " \
+		"elif test -e mmc ${emmcdev}:${part_system} /boot/diag/kernel.bin ; then " \
+			"save_boot_data ${bootcounter}; " \
+			"echo Booting in diagnostics mode; " \
+			"setenv boot_type diag; " \
+			"run emmcboot2; " \
 		"else " \
-			"if run loadimage; then " \
+			"save_boot_data ${bootcounter}; " \
+			"echo Booting in primary mode (counter=${bootcounter}); " \
+			"setenv boot_type sep; " \
+		"fi; " \
+		"run emmcboot2; " \
+		"echo Booting in rescue mode (${boot_type} failed);" \
+		"setenv boot_type ses; " \
+		"setenv force_rescue 3; " \
+		"save_boot_data ${bootcounterlimit}; " \
+		"run emmcboot2; " \
+		"echo Failed to start the rescue; " \
+		"sleep 5; " \
+		"reset; " \
+		"\0" \
+
+#define CONFIG_BOOTCOMMAND \
+	"if mmc dev ${bootmmcdev} && mmc rescan; then " \
+		"if test ${bootmmcdev} = ${mmcdev}; then " \
+			"if mmc dev ${emmcdev} && test ${try_boot_mmc2} = yes && test -e mmc ${emmcdev}:${part_store} /try-boot-mmc2; then " \
+				"if test ${bootcounter} -lt ${bootcounterlimit}; then " \
+					"check_force_rescue; " \
+				"fi; " \
+				"run emmcboot; " \
+			"fi; " \
+			"run mmcboot; " \
+			"echo Failed to start kernel from MMC1; " \
+		"elif test ${bootmmcdev} = ${emmcdev}; then " \
+			"if test ${try_boot_mmc1} = yes && test -e mmc ${emmcdev}:${part_store} /try-boot-mmc1 && mmc dev 1; then " \
 				"run mmcboot; " \
-			"else " \
-				"run netboot; " \
 			"fi; " \
+			"if test ${bootcounter} -lt ${bootcounterlimit}; then " \
+				"check_force_rescue; " \
+			"fi; " \
+			"run emmcboot; " \
+			"echo Failed to start kernel from MMC2; " \
+		"else " \
+			"echo Unknown boot device; " \
 		"fi; " \
+	"else " \
+		"echo Failed to MMC rescan; " \
 	"fi;"
 
-
 /* Link Definitions */
+#define CONFIG_LOADADDR             0x40600000
+#define CONFIG_SYS_LOAD_ADDR        CONFIG_LOADADDR
+#define CONFIG_IMAGE_LOAD_ADDR      0x46000000
+#define CONFIG_FDT_LOAD_ADDR        0x48000000
+
 #define CONFIG_SYS_INIT_RAM_ADDR        0x40000000
 #define CONFIG_SYS_INIT_RAM_SIZE        0x200000
 #define CONFIG_SYS_INIT_SP_OFFSET \
@@ -203,6 +295,7 @@
 #define CONFIG_SYS_INIT_SP_ADDR \
 	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
 
+#define CONFIG_SYS_MMC_ENV_DEV		1   /* USDHC2 */
 
 /* DDR configs */
 #define CONFIG_SYS_SDRAM_BASE           0x40000000
