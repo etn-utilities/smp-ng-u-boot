@@ -74,16 +74,7 @@
 	"emmc_dev=2\0"\
 	"sd_dev=1\0" \
 
-#if !defined(SMP_OFFICIAL_VERSION) || SMP_OFFICIAL_VERSION != 0
 #define SMP_EXTRA_ENV_SETTINGS \
-	"smp_official=1\0" \
-	"try_boot_mmc1=no\0" \
-	"try_boot_mmc2=no\0" \
-	"bootdelay=-2\0" \
-
-#else
-#define SMP_EXTRA_ENV_SETTINGS \
-	"smp_official=0\0" \
 	"try_boot_mmc1=yes\0" \
 	"try_boot_mmc2=yes\0" \
 	"bootdelay=3\0" \
@@ -92,6 +83,9 @@
 	"boot_cmd_3=setenv force_rescue 0; setenv bootcounter 0; run emmcboot\0" \
 	"boot_cmd_4=setenv force_rescue 1; run emmcboot\0" \
 	"boot_cmd_5=run erase_mmc2; bootmenu -1\0" \
+	"boot_cmd_8=setenv log_level_kernel 8; setenv log_level_journal 7; setenv ignore_loglevel ignore_loglevel=1; bootmenu -1\0" \
+	"boot_cmd_9=setenv hab_device_closed 1; setenv is_dev_board 0; setenv ignore_dev_board yes; bootmenu -1\0" \
+	"boot_cmd_10=setenv ignore_dev_board yes; setenv is_dev_board 0; bootmenu -1\0" \
 	"bootmenu_0=Boot (default)=boot\0" \
 	"bootmenu_1=Boot from SD Card=run mmcboot\0" \
 	"bootmenu_2=Boot from EMMC=run emmcboot\0" \
@@ -100,11 +94,12 @@
 	"bootmenu_5=Erase EMMC=run boot_cmd_5\0" \
 	"bootmenu_6=Memory test=mtest\0" \
 	"bootmenu_7=Reboot=reset\0" \
+	"bootmenu_8=Show all logs=run boot_cmd_8\0" \
+	"bootmenu_9=Fake Locked=run boot_cmd_9\0" \
+	"bootmenu_10=Ignore Dev Board=run boot_cmd_10\0" \
 	"bootmenu_default=0\0" \
 	"bootmenu_show=1\0" \
 	"bootmenu_delay=10\0" \
-
-#endif
 
 /* Initial environment variables */
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -112,6 +107,7 @@
 	SMP_EXTRA_ENV_SETTINGS \
     "bootdir=/boot\0" \
 	"console=ttymxc0,115200\0" \
+	"earlyconsole_arg=earlycon=ec_imx6q,0x30860000,115200\0" \
 	"script=boot.scr\0" \
     \
 	"scriptaddr="__stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
@@ -150,8 +146,14 @@
 	"boot_type=sep\0" \
 	"force_rescue=0\0" \
 	"power_fail=0\0" \
-	"mmcargs=setenv bootargs console=${console} " \
-		"earlycon=ec_imx6q,0x30860000,115200 " \
+	"hab_check_file_interface=mmc\0" \
+	"hab_check_file_dev_part=2:5\0" \
+	"hab_check_file_file=/boot/imx-boot.bin\0" \
+	"bootdata_dump=load mmc 2:2 ${loadaddr} /bootdata.bin; md.b ${loadaddr} ${filesize}\0" \
+	"mmcargs=setenv bootargs " \
+		"console=${console} " \
+		"${earlyconsole_arg} " \
+		"${ignore_loglevel} " \
 		"${optargs} " \
 		"${kernelargs} " \
 		"${cma_size} " \
@@ -159,9 +161,13 @@
 		"rootfstype=${mmcrootfstype} " \
 		"boot_type=${boot_type} " \
 		KERNEL_EXTRA_ARGS \
+		"${extra_bootargs} " \
 		"\0" \
-	"emmcargs=setenv bootargs console=${console} " \
-		"earlycon=ec_imx6q,0x30860000,115200 " \
+	"emmcargs=setenv bootargs " \
+		"console=${console} " \
+		"${earlyconsole_arg} " \
+		"${board_init_env_arg} " \
+		"${ignore_loglevel} " \
 		"${optargs} " \
 		"${kernelargs} " \
 		"${cma_size} " \
@@ -176,12 +182,10 @@
 		"hab_fuse_programmed=${hab_fuse_programmed} " \
 		"hab_fuse_content_correct=${hab_fuse_content_correct} " \
 		"hab_uboot_sig_valid=${hab_uboot_sig_valid} " \
-		"hab_boot_check_cmd_result=${hab_boot_check_cmd_result} " \
-		"hab_fuse_prog_cmd_result=${hab_fuse_prog_cmd_result} " \
-		"hab_device_close_cmd_result=${hab_device_close_cmd_result} " \
-		"hab_device_field_return_cmd_result=${hab_device_field_return_cmd_result} " \
 		"is_dev_board=${is_dev_board} " \
-		KERNEL_EXTRA_ARGS \
+		"jtag_locked=${jtag_locked} " \
+		KERNEL_EXTRA_ARGS " " \
+		"${extra_bootargs} " \
 		"\0" \
 	"loadm4bin=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${m4_bin}; " \
 		"cp.b ${loadaddr} ${m4_addr} ${filesize}; " \
@@ -199,10 +203,19 @@
 		"if test $sdram_size -gt 2048; then " \
 			"setenv cma_size cma=320M@-2048M; " \
 		"fi;\0" \
-	"mmcboot=echo Booting from MMC${mmcdev} ...; " \
+	"mmcboot=" \
+		"echo Booting from MMC${mmcdev} ...; " \
 		"run ramsize_check; " \
 		"mmc dev ${mmcdev}; " \
-		"if test -e mmc ${mmcdev} ${bootdir}/${image}; then " \
+		"if test -e mmc ${mmcdev} ${bootdir}/fitImage; then " \
+			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/fitImage; then " \
+				"run mmcargs; " \
+	            "setenv loadaddr ${img_addr}; " \
+				"bootm ${img_addr}; " \
+			"else " \
+				"echo Failed to load ${bootdir}/fitImage; " \
+			"fi; " \
+		"elif test -e mmc ${mmcdev} ${bootdir}/${image}; then " \
 			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image}; then " \
 				"unzip ${img_addr} ${loadaddr}; " \
 				"if load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}; then " \
@@ -214,28 +227,35 @@
 			"else " \
 				" echo Failed to load ${bootdir}/${image}; " \
 			"fi; " \
-		"elif test -e mmc ${mmcdev} ${bootdir}/fitImage; then " \
-			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/fitImage; then " \
-				"run mmcargs; " \
-	                        "setenv loadaddr ${img_addr}; " \
-				"bootm ${img_addr}; " \
-			"else " \
-				"echo Failed to load ${bootdir}/fitImage; " \
-			"fi; " \
 		"else " \
 			"echo Failed to load image from MMC${mmcdev} (no kernel found); " \
 		"fi;\0" \
-	"emmcboot2= " \
-		"if test -e mmc ${emmcdev}:${part_system} /boot/${boot_type}/kernel.bin; then " \
-			"load mmc ${emmcdev}:${part_system} ${img_addr} /boot/${boot_type}/kernel.bin; " \
+	"emmcboot2=" \
+		"if test -e mmc ${emmcboot2_dev}:${emmcboot2_part} ${emmcboot2_file}; then " \
 			"run emmcargs; " \
-	                "setenv loadaddr ${img_addr}; "	      \
-			"bootm ${img_addr}; " \
+			"setenv loadaddr ${img_addr}; " \
+			"size mmc ${emmcboot2_dev}:${emmcboot2_part} ${emmcboot2_file}; " \
+			"echo Loading kernel image from MMC ${emmcboot2_dev}:${emmcboot2_part} ${emmcboot2_file}; " \
+			"if load mmc ${emmcboot2_dev}:${emmcboot2_part} ${img_addr} ${emmcboot2_file}; then " \
+				"echo Validating kernel image signature; " \
+				"if hab_auth_img ${img_addr} ${filesize}; then " \
+					"echo Kernel signature is valid; " \
+					"setenv bootargs ${bootargs} secure_boot_kernel_valid=1 ; " \
+				"else " \
+					"echo Kernel signature is not valid; " \
+					"setenv bootargs ${bootargs} secure_boot_kernel_valid=0 ; " \
+				"fi; " \
+				"bootm ${img_addr}; " \
+			"else " \
+				"echo Failed to load kernel from MMC ${emmcboot2_dev}:${emmcboot2_part} ${emmcboot2_file}; " \
+			"fi; " \
 		"else " \
-			"echo No kernel found in /boot/${boot_type}; " \
+			"echo No kernel found in MMC ${emmcboot2_dev}:${emmcboot2_part} ${emmcboot2_file} ; " \
 		"fi; " \
 		"\0" \
-	"emmcboot=echo Booting from MMC${emmcdev} ...; " \
+	"emmcboot=" \
+		"check_bootdata_serial_console; " \
+		"echo Booting from MMC${emmcdev} ...; " \
 		"run ramsize_check; " \
 		"mmc dev ${emmcdev}; " \
 		"if test ${force_rescue} != 0; then " \
@@ -258,23 +278,29 @@
 			"save_boot_data ${bootcounter}; " \
 			"echo Booting in diagnostics mode; " \
 			"setenv boot_type diag; " \
-			"run emmcboot2; " \
 		"else " \
 			"save_boot_data ${bootcounter}; " \
 			"echo Booting in primary mode (counter=${bootcounter}); " \
 			"setenv boot_type sep; " \
 		"fi; " \
 		"if test -e mmc ${emmcdev}:${part_kexec} /boot/kernel.bin; then " \
-			"load mmc ${emmcdev}:${part_kexec} ${img_addr} /boot/kernel.bin; " \
-			"run emmcargs; " \
-                        "setenv loadaddr ${img_addr}; " \
-			"bootm ${img_addr}; " \
-		"fi; " \
-		"run emmcboot2; " \
-		"echo Booting in rescue mode (${boot_type} failed);" \
+			"setenv emmcboot2_dev ${emmcdev}; " \
+			"setenv emmcboot2_part ${part_kexec}; " \
+			"setenv emmcboot2_file /boot/kernel.bin; " \
+			"run emmcboot2; " \
+		"else " \
+			"setenv emmcboot2_dev ${emmcdev}; " \
+			"setenv emmcboot2_part ${part_system}; " \
+			"setenv emmcboot2_file /boot/${boot_type}/kernel.bin; " \
+			"run emmcboot2; " \
+		"fi ; " \
+		"echo Booting in rescue mode (first kernel failed);" \
 		"setenv boot_type ses; " \
 		"setenv force_rescue 3; " \
 		"save_boot_data ${bootcounterlimit}; " \
+		"setenv emmcboot2_dev ${emmcdev}; " \
+		"setenv emmcboot2_part ${part_system}; " \
+		"setenv emmcboot2_file /boot/${boot_type}/kernel.bin; " \
 		"run emmcboot2; " \
 		"echo Failed to start the rescue; " \
 		"sleep 5; " \

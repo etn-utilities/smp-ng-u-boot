@@ -441,8 +441,9 @@ static void process_fdt_options(const void *blob)
 
 const char *bootdelay_process(void)
 {
-	char *s;
-	int bootdelay, bootmenu_show;
+	const char *s;
+	int bootdelay = CONFIG_BOOTDELAY;
+	int bootmenu_show = 0;
 
 	bootcount_inc();
 

@@ -427,7 +427,7 @@ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 
 KBUILD_CPPFLAGS := -D__KERNEL__ -D__UBOOT__
 
-KBUILD_CFLAGS   := -Wall -Wstrict-prototypes \
+KBUILD_CFLAGS   := -Wall -Wstrict-prototypes -Werror=implicit-function-declaration \
 		   -Wno-format-security \
 		   -fno-builtin -ffreestanding $(CSTD_FLAG)
 KBUILD_CFLAGS	+= -fshort-wchar -fno-strict-aliasing

@@ -160,7 +160,7 @@ static int _fastboot_parts_load_from_ptable(void)
 	if (fastboot_devinfo.type == DEV_SATA) {
 #ifdef CONFIG_DM_SCSI
 		int sata_device_no = fastboot_devinfo.dev_id;
-		puts("flash target is SATA\n");
+		puts("Flash target is SATA\n");
 		scsi_scan(false);
 		dev_desc = blk_get_dev("scsi", sata_device_no);
 #else /*! CONFIG_SATA*/
@@ -170,7 +170,7 @@ static int _fastboot_parts_load_from_ptable(void)
 	} else if (fastboot_devinfo.type == DEV_MMC) {
 		int mmc_no = fastboot_devinfo.dev_id;
 
-		printf("flash target is MMC:%d\n", mmc_no);
+		printf("Flash target is MMC:%d\n", mmc_no);
 		mmc = find_mmc_device(mmc_no);
 
 		if (mmc == NULL) {
@@ -421,4 +421,3 @@ bool fastboot_parts_is_slot(void)
 	}
 	return false;
 }
-

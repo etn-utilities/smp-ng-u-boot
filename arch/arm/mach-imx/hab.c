@@ -3,10 +3,14 @@
  * Copyright (C) 2010-2015 Freescale Semiconductor, Inc.
  */
 
+//#define LOG_DEBUG
+
 #include <common.h>
 #include <command.h>
 #include <config.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdbool.h>
 #include <fuse.h>
 #include <mapmem.h>
 #include <image.h>
@@ -18,15 +22,20 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/mach-imx/hab.h>
+#include <asm/arch/imx-regs.h>
+#include <asm/mach-imx/iomux-v3.h>
 #include <linux/arm-smccc.h>
-#include <asm/mach-imx/smp.h>
+#include <asm/mach-imx/eaton-smp.h>
+#include <fs.h>
 
-
+#ifndef CONFIG_SPL_BUILD
+#include <bootdata/bootdata.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#define DEBUG_STATS_LEVEL 3
-#define BOOTFILENAME    "/imx-boot-da3050.bin"
+#define NORMAL_STATS_LEVEL 3
+#define DEBUG_STATS_LEVEL 6
 
 #define BOOTROM_BASE_ADDR  0x007e0000   // TCM start address
 #define BOOTROM_SIZE       0x40000      // TCM size
@@ -50,6 +59,26 @@ DECLARE_GLOBAL_DATA_PTR;
 #define HAB_M4_PERSISTENT_BYTES		0xB80
 #endif
 
+
+#define OCOTP_CTRL						0x30350000
+#define BM_OCOTP_CTRL_RELOAD_SHADOWS 	0x400
+
+#ifndef CONFIG_SPL_BUILD
+static int force_fuse_refresh(void)
+{
+	/* Get the base address of the OCOTP CTRL register */
+	void __iomem *ocotp_base = (void __iomem *)OCOTP_CTRL;
+
+	/* Set the RELOAD_SHADOWS bit */
+	writel(BM_OCOTP_CTRL_RELOAD_SHADOWS, ocotp_base);
+
+	/* Wait for the operation to complete or timeout */	
+	while (!(readl(ocotp_base) & BM_OCOTP_CTRL_RELOAD_SHADOWS))
+		;
+
+	return 0;
+}
+#endif
 
 static int ivt_header_error(const char *err_str, struct ivt_header *ivt_hdr)
 {
@@ -499,20 +528,14 @@ static fuse_prog_t const imx_field_return_fuse = {
 	.value = 1
 };
 
-
 #define BOOTARG_HAB_DEVICE_CLOSED                   "hab_device_closed"                   // 1 if hab device has been closed/secured, 0 otherwise
 #define BOOTARG_HAB_FUSE_PROGRAMMED                 "hab_fuse_programmed"                 // 1 if fuse hasn't been programmed yet, 0 if programmed
 #define BOOTARG_HAB_FUSE_CONTENT_CORRECT            "hab_fuse_content_correct"            // 1 if fuse has been programmed with correct content, 0 otherwise
 #define BOOTARG_HAB_UBOOT_SIG_VALID                 "hab_uboot_sig_valid"                 // 1 if signature valid
 #define BOOTARG_HAB_DEVICE_FIELD_RETURN             "hab_device_field_return"             // 1 if device in field return mode, 0 otherwise
 #define BOOTARG_HAB_DEVICE_FIELD_RETURN_LOCKED      "hab_device_field_return_locked"      // 1 if device field return fuse is locked, 0 otherwise
-#define BOOTARG_HAB_BOOT_CHECK_CMD_RESULT           "hab_boot_check_cmd_result"           // See HAB_BOOT_CHECK_RESULT_XXX enums
-#define BOOTARG_HAB_FUSE_PROG_CMD_RESULT            "hab_fuse_prog_cmd_result"            // See HAB_FUSE_PROG_RESULT_XXX enums
-#define BOOTARG_HAB_DEVICE_FIELD_RETURN_CMD_RESULT  "hab_device_field_return_cmd_result"  // See HAB_DEVICE_FIELD_RETURN_XXX enums
-#define BOOTARG_HAB_DEVICE_CLOSE_CMD_RESULT         "hab_device_close_cmd_result"         // See HAB_DEVICE_CLOSE_RESULT_XXX enums 
 #define BOOTARG_IS_DEV_BOARD                        "is_dev_board"                        // 1 if this system is a dev board.
 #define BOOTARG_DEVICE_REVOCATION_BITS              "hab_device_revocation_bits"          // First 4 bits of the SRK_REVOKE register
-
 
 static enum hab_boot_check_results s_hab_boot_check_cmd_result = HAB_BOOT_CHECK_RESULT_NO_RESULT;
 static enum hab_fuse_prog_results s_hab_fuse_prog_cmd_result = HAB_FUSE_PROG_RESULT_NO_RESULT;
@@ -549,7 +572,6 @@ void log_print(bool log, const char *format, ...)
     va_end(args);
 }
 
-
 static bool hab_fuse_programmed(void)
 {
 	bool programmed = false;
@@ -563,13 +585,8 @@ static bool hab_fuse_programmed(void)
 			break;
 		}
 	}
-	// Testing code
-	if (s_extra_cmds & EXTRA_CMD_VALID) {
-		programmed = s_extra_cmds & EXTRA_CMD_DEVICE_FUSE_FORCE ? true : false;
-	}
 	return programmed;
 }
-
 
 // Return true if HAB programmed with the fuses values we expect.
 static bool hab_fuse_content_correct(void)
@@ -577,18 +594,17 @@ static bool hab_fuse_content_correct(void)
 	bool correct = true;
 	u32 i, value;
 
-    for (i = 0 ; i < ARRAY_SIZE(s_fuses) ; i++) {
+    for (i = 0 ; i < ARRAY_SIZE(s_fuses) ; i++) 
+	{
 		value = 0;
 		fuse_read(s_fuses[i].bank, s_fuses[i].word, &value);
-		if (value != s_fuses[i].value) {
+		if (value != s_fuses[i].value) 
+		{
+			printf("HAB fuse %d,%d value 0x%08X, expected 0x%08X\n", s_fuses[i].bank, s_fuses[i].word, value, s_fuses[i].value);
 			correct = false;
-			break;
 		}
 	}
-	// Testing code
-	if (s_extra_cmds & EXTRA_CMD_VALID) {
-		correct = s_extra_cmds & EXTRA_CMD_DEVICE_FUSE_FORCE ? true : false;
-	}	
+
 	return correct;
 }
 
@@ -596,22 +612,12 @@ static bool hab_field_return_lock(void)
 {
 	bool locked;
     locked = (*((uint32_t *)OCOTP_HW_OCOTP_SW_STICKY) & OCOTP_HW_OCOTP_SW_STICKY_FIELD_LOCK) ? true : false;	
-	// Testing code
-	if (s_extra_cmds & EXTRA_CMD_VALID) {
-		locked = s_extra_cmds & EXTRA_CMD_FIELD_RETURN_FORCE ? true : false;
-	}	
 	return locked;
 }
 
-static bool hab_is_dev_board()
+static bool hab_is_dev_board(bool bIgnoreEnv)
 {
-	bool dev;
-	dev = smp_is_dev_board();
-	// Testing code
-	if (s_extra_cmds & EXTRA_CMD_VALID) {
-		dev = s_extra_cmds & EXTRA_CMD_DEV_BOARD_FORCE ? true : false;
-	}		
-	return dev;
+	return smp_is_dev_board(bIgnoreEnv);
 }
 
 static uint32_t hab_get_revoke_bits(void) 
@@ -619,10 +625,6 @@ static uint32_t hab_get_revoke_bits(void)
 	uint32_t bits;
     fuse_read(imx_srk_revoke_fuse.bank, imx_srk_revoke_fuse.word, &bits);
 	bits &= SRK_REVOKE_BITS_MASK;	
-	// Testing code
-	if (s_extra_cmds & EXTRA_CMD_VALID) {	
-		bits = s_extra_cmds & EXTRA_CMD_SRK_REV_FORCE ? 0xA : 0x5;
-	}
 	return bits;
 }
 
@@ -641,45 +643,30 @@ static bool hab_sig_valid(uint32_t *count)
     }   
     *count = event_count;
 	valid = (event_count == 0);	
-	if (s_extra_cmds & EXTRA_CMD_VALID) {	
-		valid = s_extra_cmds & EXTRA_CMD_SIG_VALID_FORCE ? true: false;
-	}
 	return valid;
 }
 
 
-#include <stdio.h>
-#include <stdbool.h>
-
 void get_security_state_str(bool device_closed, bool field_return, bool boot_sig_valid, int dev_board, char* buffer, size_t buffer_size) 
 {
-    const char *security_state = "Open";
-    const char *bootloader_signature = "Unknown";
-    const char *os_verification = dev_board ? "disabled" : "enabled";
-
-    if (field_return) {
-        security_state = "Field Return";
-		device_closed = 0;
-    } 
-
-    if (device_closed) {
-        security_state = "Closed";
-        snprintf(buffer, buffer_size, "Security State : %s, OS verification: %s", security_state, os_verification);
-		buffer[buffer_size - 1] = 0;
-        return;
+    if (!field_return && device_closed && !dev_board) 
+	{
+		snprintf(buffer, buffer_size, "Secured");
     }
-
-    if (boot_sig_valid) {
-        bootloader_signature = "Valid";
-        snprintf(buffer, buffer_size, "Security State : %s, Bootloader signature: %s, OS verification: %s", security_state, bootloader_signature, os_verification);
-    } else {
-        bootloader_signature = "Invalid";
-        snprintf(buffer, buffer_size, "Security State : %s, Bootloader signature: %s", security_state, bootloader_signature);
-    }
+	else
+	{
+		const char *security_state = field_return ? "Field Return" : (device_closed ? "Secured" : "Insecured");
+		const char *bootloader_signature = boot_sig_valid ? "Valid" : "Invalid";
+		const char *os_verification = dev_board ? "Disabled" : "Enabled";
+		
+		snprintf(buffer, buffer_size, "%s, Bootloader Signature: %s, OS Verification: %s",
+					security_state,
+					bootloader_signature != NULL ? bootloader_signature : "",
+					os_verification != NULL ? os_verification : ""
+		);
+	}
 	buffer[buffer_size - 1] = 0;	
 }
-
-
 
 static void srk_revoke_to_str(uint32_t srk_revoke_register, char *buffer, size_t buffer_size) 
 {
@@ -710,7 +697,7 @@ static void hab_fuses_to_str(char *hab_fuses_to_program_str, uint32_t hab_fuses_
 
     for (i = 0 ; i < ARRAY_SIZE(s_fuses) ; i++) {
         value = s_fuses[i].value;		
-		snprintf(buf, sizeof(buf), "0x%08x%s", value, (i == ARRAY_SIZE(s_fuses) - 1) ? "": ", ");
+		snprintf(buf, sizeof(buf), "0x%08X%s", value, (i == ARRAY_SIZE(s_fuses) - 1) ? "": ", ");
 		strncpy(hab_fuses_to_program_str, buf, remain1);
 		len = strlen(buf);
 		chunk = min(remain1, len);
@@ -719,7 +706,7 @@ static void hab_fuses_to_str(char *hab_fuses_to_program_str, uint32_t hab_fuses_
 		hab_fuses_to_program_str[0] = 0;
 
 		fuse_read(s_fuses[i].bank, s_fuses[i].word, &value);		
-		snprintf(buf, sizeof(buf), "0x%08x%s", value, (i == ARRAY_SIZE(s_fuses) - 1) ? "": ", ");
+		snprintf(buf, sizeof(buf), "0x%08X%s", value, (i == ARRAY_SIZE(s_fuses) - 1) ? "": ", ");
 		strncpy(hab_fuses_programmed_str, buf, remain2);
 		len = strlen(buf);
 		chunk = min(remain2, len);
@@ -774,10 +761,6 @@ static char *hab_config_to_str(enum hab_config config, bool *field_return, bool 
             break;
         }
     }
-	// Testing code
-	if (s_extra_cmds & EXTRA_CMD_VALID) {	
-		*field_return = s_extra_cmds & EXTRA_CMD_FIELD_RETURN_FORCE  ? true: false;
-	}
     return str;
 }
 
@@ -860,20 +843,19 @@ static int create_stats_and_bootargs(void)
 	uint32_t srk_revoke_bits;
 	char  security_state_str[128];
 
-
 	device_closed         = imx_hab_is_enabled();
 	fuse_programmed       = hab_fuse_programmed();
 	fuse_content_correct  = hab_fuse_content_correct();
 	field_return_lock     = hab_field_return_lock();
 	hab_fuses_to_str(fuses_to_program_str, sizeof(fuses_to_program_str), fuses_programmed_str, sizeof(fuses_programmed_str));
     status     = hab_rvt_report_status(&config, &state);
-    config_str = hab_config_to_str(config, &config_field_return, &config_secure);    
+    config_str = hab_config_to_str(config, &config_field_return, &config_secure);
 
-    state_str  = hab_state_to_str(state, &state_secure, &state_trusted, &state_fail);    
+    state_str  = hab_state_to_str(state, &state_secure, &state_trusted, &state_fail);
 
  	sig_valid    = hab_sig_valid(&event_count);
     uid          = smp_board_serial();
-	is_dev_board = hab_is_dev_board();
+	is_dev_board = hab_is_dev_board(false);
 
 	struct hab_hdr *hdr = (struct hab_hdr *)HAB_RVT_BASE;
 
@@ -888,37 +870,34 @@ static int create_stats_and_bootargs(void)
 
 	get_security_state_str(device_closed, config_field_return, sig_valid, is_dev_board, security_state_str, sizeof(security_state_str));
 		
-    smp_stats_begin("hab", "High Assurance Boot (HAB)", 3);
+    smp_stats_begin("hab", "-------- High Assurance Boot (HAB) -------", NORMAL_STATS_LEVEL);
     // Important stats
-    smp_stats_add_str("Version", 3, "hab_version", version_str);    
-	smp_stats_add_str("Security state", 3, "security_state", security_state_str);	
+    smp_stats_add_str("Version", DEBUG_STATS_LEVEL, "hab_version", version_str);
+	smp_stats_add_str("Security state", NORMAL_STATS_LEVEL, "security_state", security_state_str);
 
 	// Mostly debugging stats
-    smp_stats_add_bool("Device closed", DEBUG_STATS_LEVEL, "hab_device_closed", device_closed);	 	
-    smp_stats_add_bool("Device field return fuse locked", DEBUG_STATS_LEVEL, "hab_device_field_return_locked", field_return_lock);	
-    smp_stats_add_bool("Device field return", DEBUG_STATS_LEVEL, "hab_device_field_return", config_field_return);	
-	smp_stats_add_str("Device keys revoked", DEBUG_STATS_LEVEL, "keys_revoked", srk_revoke_str);	
-    smp_stats_add_bool("Fuse programmed", DEBUG_STATS_LEVEL, "hab_fuse_programmed", fuse_programmed);	
-    smp_stats_add_bool("Fuse content correct", DEBUG_STATS_LEVEL, "hab_fuse_content_correct", fuse_content_correct);		
-    smp_stats_add_str("Fuse content to program", DEBUG_STATS_LEVEL, "hab_fuses_to_program", fuses_to_program_str);
-    smp_stats_add_str("Fuse content programmed", DEBUG_STATS_LEVEL, "hab_fuses_programmed", fuses_programmed_str);	
-    smp_stats_add_bool("Bootloader signature valid", DEBUG_STATS_LEVEL, "hab_uboot_signature_valid", sig_valid);	
-    smp_stats_add_bool("Development board", DEBUG_STATS_LEVEL, "is_dev_board", is_dev_board);		
-    smp_stats_add_uint32_t("Event count", DEBUG_STATS_LEVEL, "hab_event_count", event_count);	
-    smp_stats_add_uint32_t("Boot check command result", DEBUG_STATS_LEVEL, BOOTARG_HAB_BOOT_CHECK_CMD_RESULT, s_hab_boot_check_cmd_result);
-    smp_stats_add_uint32_t("Fuse programming command result", DEBUG_STATS_LEVEL, BOOTARG_HAB_FUSE_PROG_CMD_RESULT, s_hab_fuse_prog_cmd_result);
-    smp_stats_add_uint32_t("Device close command result", DEBUG_STATS_LEVEL,  BOOTARG_HAB_DEVICE_CLOSE_CMD_RESULT, s_hab_device_close_cmd_result);	
-	smp_stats_add_uint32_t("Device field return command result", DEBUG_STATS_LEVEL, BOOTARG_HAB_DEVICE_FIELD_RETURN_CMD_RESULT, s_hab_device_field_return_cmd_result);
-	smp_stats_add_uint32_t("Device check boot command result", DEBUG_STATS_LEVEL, BOOTARG_HAB_BOOT_CHECK_CMD_RESULT, s_hab_boot_check_cmd_result);
+	smp_stats_add_hex64("UID", DEBUG_STATS_LEVEL, "uid", uid);
+	smp_stats_add_bool("Development board", DEBUG_STATS_LEVEL, "is_dev_board", hab_is_dev_board(true));
+
     smp_stats_add_str("State", DEBUG_STATS_LEVEL, "hab_state", state_str);
-    smp_stats_add_uint32_t("State value", DEBUG_STATS_LEVEL, "hab_state_value", state); 	
+    smp_stats_add_uint32_t("State value", DEBUG_STATS_LEVEL, "hab_state_value", state);
     smp_stats_add_bool("State secure", DEBUG_STATS_LEVEL, "hab_state_secure", state_secure);
     smp_stats_add_bool("State trusted", DEBUG_STATS_LEVEL, "hab_state_trusted", state_trusted);
     smp_stats_add_bool("State fail", DEBUG_STATS_LEVEL, "hab_state_fail", state_fail);
+	smp_stats_add_bool("Bootloader signature valid", DEBUG_STATS_LEVEL, "hab_uboot_signature_valid", sig_valid);    
+
+    smp_stats_add_bool("Device closed", DEBUG_STATS_LEVEL, "hab_device_closed", device_closed);
+    smp_stats_add_bool("Device field return fuse locked", DEBUG_STATS_LEVEL, "hab_device_field_return_locked", field_return_lock);
+    smp_stats_add_bool("Device field return", DEBUG_STATS_LEVEL, "hab_device_field_return", config_field_return);
+	smp_stats_add_str("Device keys revoked", DEBUG_STATS_LEVEL, "keys_revoked", srk_revoke_str);
+    smp_stats_add_bool("Fuse programmed", DEBUG_STATS_LEVEL, "hab_fuse_programmed", fuse_programmed);
+    smp_stats_add_bool("Fuse content correct", DEBUG_STATS_LEVEL, "hab_fuse_content_correct", fuse_content_correct);
+    smp_stats_add_str("Fuse content to program", DEBUG_STATS_LEVEL, "hab_fuses_to_program", fuses_to_program_str);
+    smp_stats_add_str("Fuse content programmed", DEBUG_STATS_LEVEL, "hab_fuses_programmed", fuses_programmed_str);    
+    smp_stats_add_uint32_t("Event count", DEBUG_STATS_LEVEL, "hab_event_count", event_count);
     smp_stats_add_str("Config", DEBUG_STATS_LEVEL, "hab_config", config_str);
-    smp_stats_add_uint32_t("Config value", DEBUG_STATS_LEVEL, "hab_config_value", config); 		
-    smp_stats_add_bool("Config secure", DEBUG_STATS_LEVEL, "hab_config_secure", config_secure);
-    smp_stats_add_uint64_t("UID", DEBUG_STATS_LEVEL, "uid", uid);	
+    smp_stats_add_uint32_t("Config value", DEBUG_STATS_LEVEL, "hab_config_value", config);
+    smp_stats_add_bool("Config secure", DEBUG_STATS_LEVEL, "hab_config_secure", config_secure);    
     smp_stats_end();
 
     env_set_ulong(BOOTARG_HAB_DEVICE_CLOSED, device_closed ? 1 : 0);
@@ -928,13 +907,13 @@ static int create_stats_and_bootargs(void)
     env_set_ulong(BOOTARG_HAB_FUSE_CONTENT_CORRECT, fuse_content_correct ? 1 : 0);
     env_set_ulong(BOOTARG_HAB_UBOOT_SIG_VALID, sig_valid ? 1 : 0);
     env_set_ulong(BOOTARG_IS_DEV_BOARD, is_dev_board ? 1 : 0);
-    env_set_ulong(BOOTARG_HAB_BOOT_CHECK_CMD_RESULT, s_hab_boot_check_cmd_result);
-    env_set_ulong(BOOTARG_HAB_FUSE_PROG_CMD_RESULT, s_hab_fuse_prog_cmd_result);
-	env_set_ulong(BOOTARG_HAB_DEVICE_CLOSE_CMD_RESULT, s_hab_device_close_cmd_result);
-	env_set_ulong(BOOTARG_HAB_DEVICE_FIELD_RETURN_CMD_RESULT, s_hab_device_field_return_cmd_result);
 	env_set_ulong(BOOTARG_DEVICE_REVOCATION_BITS, srk_revoke_bits);
+	env_set_ulong(BOOTARG_JTAG_LOCKED, is_jtag_locked ? 1 : 0);
 
-    smp_log_add(SMP_LOG_PRIORITY_INFORMATIONAL, security_state_str, SMP_LOG_PAGE_SECURITY, SMP_LOG_CODE_DEFAULT);      	
+	char buf[256];
+	snprintf(buf, sizeof(buf), "Secure state: %s", security_state_str);
+	buf[sizeof(buf) - 1] = 0;
+    smp_log_add(SMP_LOG_PRIORITY_INFORMATIONAL, buf, SMP_LOG_PAGE_SECURITY, SMP_LOG_CODE_DEFAULT);
 
     return 0;
 }
@@ -955,13 +934,13 @@ static int get_hab_status(bool log)
     /* Check HAB status */
     status = hab_rvt_report_status(&config, &state);
     str = hab_config_to_str(config, &field_return, &secure);
-    snprintf(line, sizeof(line), "HAB CONFIG: %s", str);      
+    snprintf(line, sizeof(line), "HAB CONFIG: %s (0x%02x)", str, config);
     line[sizeof(line) - 1] = 0;    
     if (!log) {
         printf("%s\n", line);
     }          
     str = hab_state_to_str(state, &secure, &trusted, &fail);
-    snprintf(line, sizeof(line), "HAB STATE: %s (SECURE=%s TRUSTED=%s FAIL=%s)", str, secure ? "y":"n", trusted ? "y":"n", fail ? "y":"n");     
+    snprintf(line, sizeof(line), "HAB STATE: %s (SECURE=%s TRUSTED=%s FAIL=%s) (0x%02x)", str, secure ? "y":"n", trusted ? "y":"n", fail ? "y":"n", state);     
     line[sizeof(line) - 1] = 0;
 
     if (!log) {    
@@ -1096,8 +1075,7 @@ static ulong get_image_ivt_offset(ulong img_addr)
 	}
 }
 
-static int do_authenticate_image(struct cmd_tbl *cmdtp, int flag, int argc,
-				 char *const argv[])
+static int do_authenticate_image(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	ulong	addr, length, ivt_offset;
 	int	rcode = 0;
@@ -1112,7 +1090,7 @@ static int do_authenticate_image(struct cmd_tbl *cmdtp, int flag, int argc,
 	else
 		ivt_offset = hextoul(argv[3], NULL);
 
-	rcode = imx_hab_authenticate_image(addr, length, ivt_offset);
+	rcode = imx_hab_authenticate_image(addr, length, ivt_offset, true);
 	if (rcode == 0)
 		rcode = CMD_RET_SUCCESS;
 	else
@@ -1136,8 +1114,7 @@ static int do_hab_failsafe(struct cmd_tbl *cmdtp, int flag, int argc,
 
 extern int confirm_yesno(void);
 
-static int do_hab_fuse(struct cmd_tbl *cmdtp, int flag, int argc,
-			  char *const argv[])
+static int do_hab_fuse(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	int ret = CMD_RET_FAILURE;
 	uint32_t i;
@@ -1149,78 +1126,102 @@ static int do_hab_fuse(struct cmd_tbl *cmdtp, int flag, int argc,
 		"\n"
 		"DO YOU REALLY WANT TO PROGRAM THE FUSES? <y/n> ";
 
-
 	if ((argc > 3)) {
 		cmd_usage(cmdtp);
-		goto error;
+		goto done;
 	}
 
 	for (i = 1 ; i < argc ; i++) {
 		if (!strcmp("-y", argv[i])) {
 			do_prog = true;
 		}
-		else if (!strcmp("-log", argv[i])) {
+		else if (strcmp("-log", argv[i]) == 0) {
 			do_log = true;
 		}	
 		else {
 			cmd_usage(cmdtp);
-			goto error;
+			goto done;
 		}	
 	}	
 
-	if (imx_hab_is_enabled()) {
-		log_print(do_log, "HAB_FUSE: INFO: Device is closed. Aborted.");
-		goto error;
-	}	
-	if (hab_fuse_programmed()) {
-		if (hab_fuse_content_correct()) {
-			log_print(do_log, "HAB_FUSE: INFO: Fuses already programmed with correct hash.  Use hab_close to secure the device permanently.");
-			ret = CMD_RET_SUCCESS;
-		}
-		else {
-			log_print(do_log, "HAB_FUSE: ERROR: Fuses already programmed with an unexpected hash. Aborted.");
-		}			
-		goto error;				
+	if (imx_hab_is_enabled()) 
+	{
+		log_print(do_log, "HAB_FUSE: INFO: Device is already closed.");
+		ret = CMD_RET_SUCCESS;
+		goto done;
 	}
 
-    if (!do_prog) {
+	if (hab_fuse_programmed()) 
+	{
+		if (hab_fuse_content_correct()) 
+		{
+			log_print(do_log, "HAB_FUSE: INFO: Fuses already programmed with correct hash. Use hab_close to secure the device permanently.");
+			ret = CMD_RET_SUCCESS;
+		}
+		else 
+		{
+			log_print(do_log, "HAB_FUSE: ERROR: Fuses already programmed with an unexpected hash. Aborted.");
+		}			
+		goto done;				
+	}
+
+    if (hab_is_dev_board(false)) 
+	{
+		log_print(do_log, "HAB_FUSE: WARNING: This bootloader runs on a development board. Skipping.");
+		ret = CMD_RET_SUCCESS;
+		goto done;			
+	}
+
+    if (!do_prog) 
+	{
 		char  hab_fuses_to_program[128];
 		char  hab_fuses_programmed[128];
 		hab_fuses_to_str(hab_fuses_to_program, sizeof(hab_fuses_to_program), hab_fuses_programmed, sizeof(hab_fuses_programmed));		
 		printf("\nFUSES VALUES TO PROGRAM: {%s}\n\n", hab_fuses_to_program);
 		puts(warn);
-		if (confirm_yesno()) {
+		if (confirm_yesno()) 
+		{
 			do_prog = true;
-		} else {
+		} 
+		else 
+		{
 			puts("Fuse programming aborted");
-			goto error;
+			goto done;
 		}
 	}
 
-	if (do_prog) {
-		for (i = 0 ; i < ARRAY_SIZE(s_fuses) ; i++) {
+	if (do_prog) 
+	{
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
+		for (i = 0 ; i < ARRAY_SIZE(s_fuses) ; i++) 
+		{
 			fuse_prog(s_fuses[i].bank, s_fuses[i].word, s_fuses[i].value);
 		}
-		if (hab_fuse_content_correct()) {
-			log_print(do_log, "HAB_FUSE: SUCCESS: Fuse keys programmed with success.");
-		}		
-		else {
-			log_print(do_log, "HAB_FUSE: ERROR: Cannot program fuse keys!");	
-			goto error;		
+		if (force_fuse_refresh() != 0) 
+		{
+			log_print(do_log, "HAB_FUSE: WARNING: Cannot refresh fuse registers!");	
 		}
+		else if (!hab_fuse_content_correct()) 
+		{
+			log_print(do_log, "HAB_FUSE: ERROR: Invalid fused keys!");	
+		}
+		else
+		{
+			log_print(do_log, "HAB_FUSE: SUCCESS: Fuse keys programmed with success.");
+			ret = CMD_RET_SUCCESS;
+		}
+#else
+		log_print(do_log, "HAB_FUSE: SUCCESS: Nothing done (not official build)");
+		ret = CMD_RET_SUCCESS;
+#endif
 	}
-	ret = CMD_RET_SUCCESS;
-error:		
-    log_print(do_log, "HAB_FUSE: %s: Operation %s.", (ret == CMD_RET_SUCCESS) ? "SUCCESS":"ERROR",(ret == CMD_RET_SUCCESS) ? "succeeded": "failed");
-    s_hab_fuse_prog_cmd_result = (ret == CMD_RET_SUCCESS) ? HAB_FUSE_PROG_RESULT_SUCCESS : HAB_FUSE_PROG_RESULT_FAIL;
-    env_set_ulong(BOOTARG_HAB_FUSE_PROG_CMD_RESULT, s_hab_fuse_prog_cmd_result);
+	
+done:		
+    log_print(do_log, "HAB_FUSE: %s: Operation %s", (ret == CMD_RET_SUCCESS) ? "SUCCESS" : "ERROR", (ret == CMD_RET_SUCCESS) ? "succeeded" : "failed");
 	return ret;
 }
 
-
-
-static int do_hab_close(struct cmd_tbl *cmdtp, int flag, int argc,
-			  char *const argv[])
+static int do_hab_close(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	int ret = CMD_RET_FAILURE;
 	bool do_prog = false;
@@ -1260,7 +1261,8 @@ static int do_hab_close(struct cmd_tbl *cmdtp, int flag, int argc,
 		}	
 	}
 	if (imx_hab_is_enabled()) {
-		log_print(do_log, "HAB_CLOSE: INFO: Device is already closed. Aborted.");
+		log_print(do_log, "HAB_CLOSE: INFO: Device is already closed.");
+		ret = CMD_RET_SUCCESS;
 		goto error;
 	}	
 	if (!hab_fuse_programmed()) {
@@ -1290,31 +1292,39 @@ static int do_hab_close(struct cmd_tbl *cmdtp, int flag, int argc,
 		goto error;			
 	}	
 
-    if (hab_is_dev_board()) {
-		log_print(do_log, "HAB_CLOSE: ERROR: This bootloader runs on a development board. Aborted.");
+    if (hab_is_dev_board(false)) 
+	{
+		ret = CMD_RET_SUCCESS;
+		log_print(do_log, "HAB_CLOSE: WARNING: This bootloader runs on a development board. Skipping.");
 		goto error;			
 	}
 
-    if (do_prog) {
+    if (do_prog) 
+	{
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
 	    struct imx_sec_config_fuse_t *fuse =
 		(struct imx_sec_config_fuse_t *)&imx_sec_config_fuse;
         fuse_prog(fuse->bank, fuse->word, HAB_ENABLED_BIT);
+
+		if (force_fuse_refresh() != 0) {
+			log_print(do_log, "HAB_CLOSE: WARNING: Cannot refresh fuse registers!");	
+		}
+
 		if (!imx_hab_is_enabled()) {
 			log_print(do_log, "HAB_CLOSE: ERROR: Fuse programming error. Device not closed.");
 			goto error;
-		}			
+		}
+#else
+		log_print(do_log, "HAB_CLOSE: Nothing done (not official build)");
+#endif
 	}
 	ret = CMD_RET_SUCCESS;
 error:		
     log_print(do_log, "HAB_CLOSE: %s: Operation %s.", (ret == CMD_RET_SUCCESS) ? "SUCCESS":"ERROR",(ret == CMD_RET_SUCCESS) ? "succeeded": "failed");
-    s_hab_device_close_cmd_result = (ret == CMD_RET_SUCCESS) ? HAB_DEVICE_CLOSE_RESULT_SUCCESS : HAB_DEVICE_CLOSE_RESULT_FAIL;
-    env_set_ulong(BOOTARG_HAB_DEVICE_CLOSE_CMD_RESULT, s_hab_device_close_cmd_result);		
 	return ret;
 }
 
-
-static int do_hab_field_return(struct cmd_tbl *cmdtp, int flag, int argc,
-			  char *const argv[])
+static int do_hab_field_return(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	int ret = CMD_RET_FAILURE;
 	uint32_t  i;
@@ -1360,7 +1370,16 @@ static int do_hab_field_return(struct cmd_tbl *cmdtp, int flag, int argc,
 		}
 	}
 
-    if (do_prog) {
+	if (hab_is_dev_board(false)) 
+	{
+		ret = CMD_RET_SUCCESS;
+		log_print(do_log, "HAB_FIELD_RETURN: WARNING: This bootloader runs on a development board. Skipping.");
+		goto error;			
+	}	
+
+    if (do_prog)
+	{
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
 		// This command will fail if the unlock command hasn't been done in the CSF for the specific UID
 		// So this is not a security hole.
 		// A field return implies:
@@ -1374,89 +1393,175 @@ static int do_hab_field_return(struct cmd_tbl *cmdtp, int flag, int argc,
 			log_print(do_log, "HAB_FIELD_RETURN: ERROR: Fuse programming failed. Aborted.");
             goto error;
 		}
+		if (force_fuse_refresh() != 0) {
+			log_print(do_log, "HAB_FIELD_RETURN: WARNING: Cannot refresh fuse registers!");	
+		}
+#else
+		log_print(do_log, "HAB_FIELD_RETURN: Nothing done (not official build)");
+#endif
 	}
 	ret = CMD_RET_SUCCESS;
 error:		
     log_print(do_log, "HAB_FIELD_RETURN: %s: Operation %s.", (ret == CMD_RET_SUCCESS) ? "SUCCESS":"ERROR",(ret == CMD_RET_SUCCESS) ? "succeeded": "failed");
-	s_hab_device_field_return_cmd_result = (ret == CMD_RET_SUCCESS)  ? HAB_DEVICE_FIELD_RETURN_RESULT_SUCCESS: HAB_DEVICE_FIELD_RETURN_RESULT_FAIL;	
-	env_set_ulong(BOOTARG_HAB_DEVICE_FIELD_RETURN_CMD_RESULT, s_hab_device_field_return_cmd_result);	
 	return ret;
 }
 
+extern int _fs_read(const char *filename, ulong addr, loff_t offset, loff_t len, int do_lmb_check, loff_t *actread);
 
+static int do_hab_is_locked(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+{
+	if (!imx_hab_is_enabled()) 
+	{
+		printf("Secure boot is disabled\n");
+		return CMD_RET_FAILURE;
+	}
 
+	printf("Secure boot enabled\n");
+	return CMD_RET_SUCCESS;
+}
 
-static int do_hab_check_boot(struct cmd_tbl *cmdtp, int flag, int argc,
-			  char *const argv[])
+static int do_hab_is_dev(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	int ret = CMD_RET_FAILURE;
-	uint32_t         len_read, size, addr, count, i;
+
+	if (!hab_is_dev_board(false))
+	{
+		printf("This is not a dev board\n");
+		return CMD_RET_FAILURE;
+	}
+
+	printf("This is a dev board\n");
+
+	return ret;
+}
+
+static int do_hab_is_required(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+{
+	if (!imx_hab_is_required()) 
+	{
+		printf("Secure boot is not required\n");
+		return CMD_RET_FAILURE;
+	}
+
+	printf("Secure boot is required\n");
+	return CMD_RET_SUCCESS;
+}
+
+static int do_hab_refresh_fuse(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+{
+	if (force_fuse_refresh() != 0) {
+		printf("Failed to refresh fuse registers\n");
+		return CMD_RET_FAILURE;
+	}
+
+	printf("Fuse registers refreshed\n");
+	return CMD_RET_SUCCESS;
+}
+
+// "[-log] <interface> <dev[:part]> <filename>\n"
+static int do_hab_check_file(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+{
+	int ret = CMD_RET_FAILURE;
+	uint32_t size, addr, count;
 	imx_header_v3_t *imx_hdr;
-    uint8_t          event_data[128]; 
-    size_t           bytes = sizeof(event_data);	
-	bool do_log  = false;	
+	uint8_t event_data[128];
+	size_t bytes = sizeof(event_data);
+	loff_t len_read = 0;
 
-	if ((argc > 2)) {
-		cmd_usage(cmdtp);
+	bool arg_log = false;
+	const char *arg_interface = env_get("hab_check_file_interface");
+	const char *arg_devpart = env_get("hab_check_file_dev_part");
+	const char *arg_filename = env_get("hab_check_file_file");
+
+	if (argc < 1)
+		return CMD_RET_USAGE;
+
+	int iArg = 1;
+	if (iArg < argc && strcmp("-log", argv[iArg]) == 0) 
+	{
+		arg_log = true;
+		iArg++;
+	}
+	
+	if (iArg < argc)
+		arg_interface = argv[iArg++];
+	if (iArg < argc)
+		arg_devpart = argv[iArg++];
+	if (iArg < argc)
+		arg_filename = argv[iArg++];
+
+	if (iArg < argc)
+		return CMD_RET_USAGE;
+
+	if (!arg_interface) {
+		puts("** No interface defined **\n");
+		return 1;
+	}
+	if (!arg_devpart) {
+		puts("** No dev:part defined **\n");
+		return 1;
+	}
+	if (!arg_filename) {
+		puts("** No file defined **\n");
+		return 1;
+	}
+
+	if (fs_set_blk_dev(arg_interface, arg_devpart, FS_TYPE_ANY)) {
+		log_err("Can't set block device\n");
+		return 1;
+	}
+
+	len_read = 0;
+	ret = _fs_read(arg_filename, DRAM_ADDRESS, 0, 0, 1, &len_read);
+	if (ret < 0) {
+		log_err("Failed to load '%s' (%d)\n", arg_filename, ret);
+		return 1;
+	}
+
+	if (len_read < sizeof(imx_header_v3_t))
+	{
+		log_print(arg_log, "hab_check_file: ERROR: %s has an invalid size (%d).", arg_filename, len_read);
 		goto error;
 	}
 
-	for (i = 1 ; i < argc ; i++) {
-        if (!strcmp("-log", argv[i])) {
-			do_log = true;
-		}	
-		else {
-			cmd_usage(cmdtp);
-			goto error;
-		}	
-	}	
-
-	if (smp_file_read(BOOTFILENAME, (char *)DRAM_ADDRESS, DRAM_SIZE, &len_read)) {
-		log_print(do_log, "HAB_CHECK_BOOT: ERROR: Boot file %s not found.  Aborted.", BOOTFILENAME);				
-		goto error;
-	}
-	if (len_read < sizeof(imx_header_v3_t)) {
-		log_print(do_log, "HAB_CHECK_BOOT: ERROR: Boot file %s has an invalid size.", BOOTFILENAME);				
-		goto error;			
-	}
 	imx_hdr = (imx_header_v3_t *)DRAM_ADDRESS;
-	if (verify_ivt_header((struct ivt_header *)imx_hdr)) {
-		log_print(do_log, "HAB_CHECK_BOOT: ERROR: Boot file %s has an invalid IVT.", BOOTFILENAME);				
-		goto error;			
+	if (verify_ivt_header((struct ivt_header *)imx_hdr))
+	{
+		log_print(arg_log, "hab_check_file: ERROR: %s has an invalid IVT.", arg_filename);
+		goto error;
 	}
 	addr = imx_hdr->boot_data.start + 0x400;
 	size = imx_hdr->boot_data.size - 0x400;
-	
-	if ((addr < BOOTROM_BASE_ADDR) || (addr >= BOOTROM_BASE_ADDR + BOOTROM_SIZE)) {
-		log_print(do_log, "HAB_CHECK_BOOT: ERROR: Boot file %s is invalid.", BOOTFILENAME);				
-		goto error;					
-	}
-	memcpy((char *)addr, (char *)DRAM_ADDRESS, size);
-	if (imx_hab_authenticate_image(addr, size, 0)) {
-		log_print(do_log, "HAB_CHECK_BOOT: ERROR: Boot file %s fails signature check.  Aborted.", BOOTFILENAME);					
+
+	if ((addr < BOOTROM_BASE_ADDR) || (addr >= BOOTROM_BASE_ADDR + BOOTROM_SIZE))
+	{
+		log_print(arg_log, "hab_check_file: ERROR: %s is invalid.", arg_filename);
 		goto error;
 	}
-    count = 0;
-    while (hab_rvt_report_event(HAB_STS_ANY, count, event_data,
-                    &bytes) == HAB_SUCCESS) {     
-        count++;
-        bytes = sizeof(event_data);
-    }
-	if (count) {
-	    log_print(do_log, "HAB_CHECK_BOOT: INFO: Boot file %s fails signature check.", BOOTFILENAME);		
-		goto error;			
-	}	
-	log_print(do_log, "HAB_CHECK_BOOT: INFO: Boot file %s is genuine.", BOOTFILENAME);	
+	memcpy((char *)addr, (char *)DRAM_ADDRESS, size);
+	if (imx_hab_authenticate_image(addr, size, 0, true))
+	{
+		log_print(arg_log, "hab_check_file: ERROR: %s fails signature check. Aborted.", arg_filename);
+		goto error;
+	}
+	count = 0;
+	while (hab_rvt_report_event(HAB_STS_ANY, count, event_data, &bytes) == HAB_SUCCESS)
+	{
+		count++;
+		bytes = sizeof(event_data);
+	}
+	if (count)
+	{
+		log_print(arg_log, "hab_check_file: INFO: %s fails signature check.", arg_filename);
+		goto error;
+	}
+	log_print(arg_log, "hab_check_file: INFO: %s is genuine.", arg_filename);
 	ret = CMD_RET_SUCCESS;
-error:		
-    s_hab_boot_check_cmd_result = ret == CMD_RET_SUCCESS ? HAB_BOOT_CHECK_RESULT_VALID : HAB_BOOT_CHECK_RESULT_INVALID;
-    env_set_ulong(BOOTARG_HAB_BOOT_CHECK_CMD_RESULT, s_hab_boot_check_cmd_result);		
+error:
 	return ret;
 }
 
-
-static int do_hab_version(struct cmd_tbl *cmdtp, int flag, int argc,
-			  char *const argv[])
+static int do_hab_version(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	struct hab_hdr *hdr = (struct hab_hdr *)HAB_RVT_BASE;
 
@@ -1470,8 +1575,7 @@ static int do_hab_version(struct cmd_tbl *cmdtp, int flag, int argc,
 	return 0;
 }
 
-static int do_authenticate_image_or_failover(struct cmd_tbl *cmdtp, int flag,
-					     int argc, char *const argv[])
+static int do_authenticate_image_or_failover(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	int ret = CMD_RET_FAILURE;
 
@@ -1558,10 +1662,37 @@ U_BOOT_CMD(
 	  );	  
 
 U_BOOT_CMD(
-		hab_check_boot, 2, 0, do_hab_check_boot,
-		"validate boot signature",
-		"hab_check_boot"
+		hab_check_file, 6, 0, do_hab_check_file,
+		"validate a file signature (HAB)",
+		"[-log] <interface> <dev[:part]> <filename>\n"
+		"    - Validate a file 'filename' from partition 'part' on device\n"
+		"       type 'interface' instance 'dev'.\n"
+	);
+	
+U_BOOT_CMD(
+		hab_is_locked, 1, 0, do_hab_is_locked,
+		"Test if the device is locked",
+		"hab_is_locked"
 	  );
+
+U_BOOT_CMD(
+		hab_is_dev, 1, 0, do_hab_is_dev,
+		"Test if the device is a dev board",
+		"hab_is_dev"
+	  );
+
+U_BOOT_CMD(
+		hab_is_required, 1, 0, do_hab_is_required,
+		"Test if HAB authentication is required",
+		"hab_is_required"
+	  );
+
+U_BOOT_CMD(
+		hab_refresh_fuse, 1, 0, do_hab_refresh_fuse,
+		"refresh fuse shadow resiters",
+		"hab_refresh_fuse"
+	  );
+
 
 #endif /* !defined(CONFIG_SPL_BUILD) */
 
@@ -1739,23 +1870,15 @@ bool imx_hab_is_enabled(void)
 		puts("\nSecure boot fuse read error\n");
 #endif		
         goto end;
-
 	}
    
 	enabled =  (reg & HAB_ENABLED_BIT) == HAB_ENABLED_BIT;
-#ifndef CONFIG_SPL_BUILD
-	// Testing code.
-	if (s_extra_cmds & EXTRA_CMD_VALID) {
-		enabled = s_extra_cmds & EXTRA_CMD_DEVICE_CLOSE_FORCE ? true : false;
-	}
-#endif	
 end:
     return enabled;
 
 }
 
-int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
-			       uint32_t ivt_offset)
+int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size, uint32_t ivt_offset, bool force_required)
 {
 	ulong load_addr = 0;
 	size_t bytes;
@@ -1765,14 +1888,10 @@ int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
 	struct ivt *ivt;
 	enum hab_status status;
 
-	if (!imx_hab_is_enabled()) {
-#ifndef CONFIG_SPL_BUILD		
-		puts("hab fuse not enabled\n");
-#endif
-	}
-
-#ifndef CONFIG_SPL_BUILD	
-	printf("\nAuthenticate image from DDR location 0x%x...\n", ddr_start);
+#ifndef CONFIG_SPL_BUILD
+		if (!imx_hab_is_enabled())
+			puts("hab fuse not enabled\n");
+		printf("\nAuthenticate image from DDR location 0x%x...\n", ddr_start);
 #endif	
 
 	hab_caam_clock_enable(1);
@@ -1806,6 +1925,7 @@ int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
 #endif		
 		goto hab_exit_failure_print_status;
 	}
+
 #ifdef DEBUG
 	printf("\nivt_offset = 0x%x, ivt addr = 0x%lx\n", ivt_offset, ivt_addr);
 	printf("ivt entry = 0x%08x, dcd = 0x%08x, csf = 0x%08x\n", ivt->entry,
@@ -1861,7 +1981,7 @@ int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
 			ivt_offset, (void **)&start,
 			(size_t *)&bytes, NULL);
 	if (hab_rvt_exit() != HAB_SUCCESS) {
-#ifndef CONFIG_SPL_BUILD		
+#ifndef CONFIG_SPL_BUILD
 		puts("hab exit function fail\n");
 #endif		
 		load_addr = 0;
@@ -1874,7 +1994,7 @@ hab_exit_failure_print_status:
 
 hab_authentication_exit:
 
-	if (load_addr != 0  || !imx_hab_is_enabled())
+	if (load_addr != 0 || (!force_required && !imx_hab_is_required()))
 		result = 0;
 
 	return result;
@@ -1889,45 +2009,131 @@ int authenticate_image(u32 ddr_start, u32 raw_image_size)
 					~(ALIGN_SIZE - 1);
 	bytes = ivt_offset + IVT_SIZE + CSF_PAD_SIZE;
 
-	return imx_hab_authenticate_image(ddr_start, bytes, ivt_offset);
+	return imx_hab_authenticate_image(ddr_start, bytes, ivt_offset, false);
 }
 
 void hab_late_init(bool fuse_device, bool close_device, bool check_boot, bool field_return, bool reset_after, uint8_t extra_cmds)
 {
 #ifndef CONFIG_SPL_BUILD	
 
+int hab_late_init(struct eaton_boot_data_struct *boot_data)
+{	
     // Keep this code here as the following run_command() can generate events when testing for boot validity	
     get_hab_status(true);
 
-    // Check the commands to run
-    if (fuse_device) {
-		run_command("hab_fuse -y -log", 0);
+	if (boot_data == NULL)
+		return -1;
+
+	if (boot_data->debug_prog_fuses == 0)
+	{
+		if (hab_fuse_programmed())
+		{
+			boot_data->fuse_device = hab_fuse_content_correct() ? BOOT_DATA_ACTION_SUCCESS : BOOT_DATA_ACTION_INVALID;
+		}
+
+		if (imx_hab_is_enabled())
+		{
+			boot_data->close_device = BOOT_DATA_ACTION_SUCCESS;
+		}
+
+		enum hab_config config = 0;
+		enum hab_state state = 0;  
+		enum hab_status status = hab_rvt_report_status(&config, &state);
+		bool config_secure;
+		bool config_field_return;
+		hab_config_to_str(config, &config_field_return, &config_secure);
+		if (config_field_return)
+		{
+			boot_data->field_return = BOOT_DATA_ACTION_SUCCESS;
+		}
 	}
-	if (close_device) {
-		run_command("hab_close -y -log", 0);
+
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
+	if (boot_data->fuse_device == BOOT_DATA_ACTION_EXEC)
+	{		
+		if (run_command("hab_fuse -y -log", 0) != CMD_RET_SUCCESS)
+		{
+			boot_data->fuse_device = BOOT_DATA_ACTION_FAILED;
+			if (boot_data->close_device)
+				boot_data->close_device = BOOT_DATA_ACTION_CANCELED;
+			if (boot_data->field_return)
+				boot_data->field_return = BOOT_DATA_ACTION_CANCELED;
+			if (boot_data->check_boot)
+				boot_data->check_boot = BOOT_DATA_ACTION_CANCELED;
+
+			printf("Error fusing the device\n");
+		}
+		else
+		{
+			boot_data->fuse_device = BOOT_DATA_ACTION_SUCCESS;
+			return 1; // reset
+		}
 	}
-	if (field_return) {
-		run_command("hab_field_return -y -log", 0);			
+	else if (boot_data->close_device == BOOT_DATA_ACTION_EXEC)
+	{		
+		if (run_command("hab_close -y -log", 0) != CMD_RET_SUCCESS)
+		{
+			boot_data->close_device = BOOT_DATA_ACTION_FAILED;
+			if (boot_data->field_return)
+				boot_data->field_return = BOOT_DATA_ACTION_CANCELED;
+			if (boot_data->check_boot)
+				boot_data->check_boot = BOOT_DATA_ACTION_CANCELED;
+			printf("Error closing the device\n");
+		}
+		else
+		{
+			boot_data->close_device = BOOT_DATA_ACTION_SUCCESS;
+			return 1; // reset
+		}
 	}
-	if (reset_after) {
-		do_reset(NULL, 0, 0, NULL);
-	}	
-	if (extra_cmds) {
-		// Used for testing.
-		s_extra_cmds = extra_cmds;
+	else if (boot_data->field_return == BOOT_DATA_ACTION_EXEC)
+	{		
+		if (run_command("hab_field_return -y -log", 0) != CMD_RET_SUCCESS)
+		{
+			boot_data->field_return = BOOT_DATA_ACTION_FAILED;
+			if (boot_data->check_boot)
+				boot_data->check_boot = BOOT_DATA_ACTION_CANCELED;
+			printf("Error fusing the field_return\n");
+		}
+		else
+		{
+			boot_data->field_return = BOOT_DATA_ACTION_SUCCESS;
+			return 1; // reset
+		}
 	}
+#endif
 
     create_stats_and_bootargs();
-	smp_stats_flush();	
+	smp_stats_flush();
 
     // Keep this last as this may generate events
-	if (check_boot) {
-		run_command("hab_check_boot -log", 0);
+	if (boot_data->check_boot == BOOT_DATA_ACTION_EXEC)
+	{		
+		if (run_command("hab_check_file -log", 0) != CMD_RET_SUCCESS)
+		{
+			boot_data->check_boot = BOOT_DATA_ACTION_FAILED;
+		}
+		else
+		{
+			boot_data->check_boot = BOOT_DATA_ACTION_SUCCESS;
+		}
 	}
-
 
     smp_log_flush();	
 
+	return 0;
+}
+#endif
 
-#endif	
+bool imx_hab_is_required(void)
+{
+	if (!imx_hab_is_enabled())
+		return false;
+
+#ifndef CONFIG_SPL_BUILD
+	if (hab_is_dev_board(false))
+		return false;
+#endif
+
+	return true;
 }
