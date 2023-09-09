@@ -21,12 +21,17 @@
 #include <mmc.h>
 #include <blk.h>
 #include <fs.h>
+#include <inttypes.h>
 
 #include "../common/extcon-ptn5150.h"
 #include "../common/imx8_eeprom.h"
 #include "imx8mm_var_dart.h"
 
+#include <asm/mach-imx/eaton-smp.h>
+
+#ifndef CONFIG_SPL_BUILD
 #include <bootdata/bootdata.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 #define BOOT_COUNTER_LIMIT		BOOT_COUNT_LIMIT
@@ -45,8 +50,10 @@ DECLARE_GLOBAL_DATA_PTR;
 
 extern int var_setup_mac(struct var_eeprom *eeprom);
 
+#ifndef CONFIG_SPL_BUILD
 static int smp_read_gpio_value(int bank_number, int offset);
 static int smp_set_gpio_value(int bank_number, int offset, int value);
+#endif
 
 #define GPIO_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1 | PAD_CTL_PUE | PAD_CTL_PE)
 
@@ -227,37 +234,125 @@ int board_init(void)
 	return 0;
 }
 
+#ifndef CONFIG_SPL_BUILD
 static int bootdata_read(struct eaton_boot_data_struct *boot_data)
 {
-	loff_t len_read = 0;
-	int ret;
+	if (boot_data == NULL)
+		return -1;
 
 	if (fs_set_blk_dev(BOOTDATA_IFACE, BOOTDATA_PART, FS_TYPE_EXT))
-		return 1;
+		return -2;
 
-	ret = fs_read(BOOTDATA_FILENAME, (ulong)boot_data, 0, sizeof(struct eaton_boot_data_struct), &len_read);
+	loff_t len_read = 0;
+	int ret = fs_read(BOOTDATA_FILENAME, (ulong)boot_data, 0, sizeof(struct eaton_boot_data_struct), &len_read);
 	if (ret < 0)
-		return 2;
+		return -3;
 
 	return 0;
 }
 
 static int bootdata_write(const struct eaton_boot_data_struct *boot_data)
 {
-	loff_t len_written = 0;
-	int ret;
+	if (boot_data == NULL)
+		return -1;
 
 	if (fs_set_blk_dev(BOOTDATA_IFACE, BOOTDATA_PART, FS_TYPE_EXT))
-		return 1;
+		return -2;
 
-	ret = fs_write(BOOTDATA_FILENAME, (ulong)boot_data, 0, sizeof(struct eaton_boot_data_struct), &len_written);
+	loff_t len_written = 0;
+	int ret = fs_write(BOOTDATA_FILENAME, (ulong)boot_data, 0, sizeof(struct eaton_boot_data_struct), &len_written);
 	if (ret < 0)
-		return 2;
+		return -3;
+
+	return sizeof(eaton_boot_data_struct);
+}
+
+static int bootdata_compare_write(const struct eaton_boot_data_struct *boot_data)
+{
+	if (boot_data == NULL)
+		return -1;
+
+	struct eaton_boot_data_struct r = {0};
+	if (bootdata_read(&r) >= 0 && memcmp(&r, boot_data, sizeof(struct eaton_boot_data_struct)) == 0)
+		return 0;
+
+	return bootdata_write(boot_data);
+}
+
+extern void hab_late_init(bool fuse_device, bool close_device, bool check_boot, bool field_return, bool reset_after, uint8_t extra_cmds);
+extern bool imx_hab_is_required(void);
+extern int hab_late_init(struct eaton_boot_data_struct *boot_data);
+extern bool imx_hab_is_enabled(void);
+
+int board_early_check_serial_console(void)
+{	
+	if (mmc_get_env_dev() == 1) // 1: SD Card
+	{
+		printf("Serial console is needed for SD card\n");
+		return 0;
+	}
+
+	struct eaton_boot_data_struct boot_data = {0};
+	bootdata_read(&boot_data);
+	if (boot_data.serial_console == 255 || (boot_data.serial_console == 0 && imx_hab_is_enabled() && (boot_data.ignore_dev_board != 0 || !smp_is_dev_board(false))))
+	{
+		printf("Disabling the serial console\n");
+
+		gd->flags |= GD_FLG_SILENT | GD_FLG_DISABLE_CONSOLE;
+		env_set("silent", "1");
+	}
+	else if (boot_data.serial_console >= 128)
+	{
+		printf("=================================================\n");
+		printf("Serial console would be disabled from this point\n");
+		printf("=================================================\n");
+	}
+	else
+	{
+		printf("Serial console is enabled\n");
+
+		char buf[64];
+		snprintf(buf, sizeof(buf), "serial_console=%d", boot_data.serial_console);
+		buf[sizeof(buf) - 1] = 0;
+		env_set("board_init_env_arg", buf);
+		return 0;
+	}
+
+	printf("Serial console is disabled\n");
+	env_set("console", "ttynull");
+	env_set("earlyconsole_arg", "");
+	env_set("board_init_env_arg", "quiet silent loglevel=0 serial_console=-1 systemd.show_status=false");
 
 	return 0;
 }
 
-extern void hab_late_init(bool fuse_device, bool close_device, bool check_boot, bool field_return, bool reset_after, uint8_t extra_cmds);
+int do_check_bootdata_serial_console(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	if (mmc_get_env_dev() == 1) // SD card
+		return 0;
+
+	struct eaton_boot_data_struct boot_data = {0};
+	bootdata_read(&boot_data);
+
+	if (boot_data.serial_console >= 128 || (boot_data.serial_console == 0 && imx_hab_is_enabled() && (boot_data.ignore_dev_board != 0 || !smp_is_dev_board(false))))
+	{
+		printf("=================================================\n");
+		printf("Disabling the serial console for good\n");
+		printf("=================================================\n");
+		gd->flags |= GD_FLG_SILENT | GD_FLG_DISABLE_CONSOLE;
+		env_set("silent", "1");
+		return 0;
+	}	
+
+	return 0;
+}
+
+U_BOOT_CMD(check_bootdata_serial_console, 1, 0, do_check_bootdata_serial_console,
+			"Check bootdata serial console value and set environment values.\n",
+			"");
+
+#endif
+
 
 #define SDRAM_SIZE_STR_LEN 5
 int board_late_init(void)
@@ -273,20 +368,16 @@ int board_late_init(void)
 	extcon_ptn5150_setup(&usb_ptn5150);
 #endif
 
-	struct eaton_boot_data_struct boot_data = {0};
-	char boot_count_str[5];
-	int rc = 0;
-	u32 boot_cause;
-	char boot_cause_str[11];
-	int read_pflatch_count = 0;
 
 #ifdef CONFIG_FEC_MXC
 	var_setup_mac(ep);
 #endif
 	var_eeprom_print_prod_info(ep);
 
-	som_rev = var_get_som_rev(ep);
+	printf("Serial ID: 0x%" PRIX64 " %s\n", smp_board_serial(), smp_is_dev_board(true) ? "(dev)" : "");
 
+	som_rev = var_get_som_rev(ep);
+	
 	snprintf(sdram_size_str, SDRAM_SIZE_STR_LEN, "%d", (int) (gd->ram_size / 1024 / 1024));
 	env_set("sdram_size", sdram_size_str);
 
@@ -323,71 +414,32 @@ int board_late_init(void)
 	board_late_mmc_env_init();
 #endif
 
-	env_set_ulong("bootmmcdev", mmc_get_env_dev());
+	u32 mmc_boot_dev = mmc_get_env_dev();
+	env_set_ulong("bootmmcdev", mmc_boot_dev);
 
 // The following code was included into the SPL increasing the size unintentionally
 #ifndef CONFIG_SPL_BUILD
+	struct eaton_boot_data_struct boot_data = {0};
+	char buf[64];
+	int rc = 0;
+	u32 boot_cause;
+	int read_pflatch_count = 0;
+
 	rc = bootdata_read(&boot_data);
-	if (rc != 0)
+	if (rc < 0)
 	{
 		printf("Error reading bootdata.bin\n");
 		memset(&boot_data, 0, sizeof(boot_data));
 	}
 
-    uint8_t prod_close_sequence = 0;
-	bool fuse_device  = false;
-	bool close_device = false;
-	bool check_boot  = false;
-	bool field_return = false;
-	bool reset_after = false;
-	uint8_t extra_cmds = 0;
+	env_set("ignore_dev_board", boot_data.ignore_dev_board ? "yes" : "no");
+	if (boot_data.ignore_dev_board)
+		printf("This dev board will behave like it was not (ignore_dev_board)\n");
 
-    fuse_device         = boot_data.fuse_device_flag  ? true : false;
-	close_device        = boot_data.close_device_flag ? true : false;
-	check_boot          = boot_data.check_boot_flag   ? true : false;
-	field_return        = boot_data.field_return_flag ? true : false;
-	prod_close_sequence = boot_data.prod_close_sequence;
-	extra_cmds          = boot_data.extra_cmds;
-
-	
-	// Sanity check.
-	if (prod_close_sequence > 2) {
-		prod_close_sequence = 2;
-	}
-
-	if (fuse_device || close_device || check_boot || field_return || prod_close_sequence || extra_cmds) {
-		uint8_t seq = prod_close_sequence;
-
-		if (seq) seq--;
-	    boot_data.fuse_device_flag    = 0;
-		boot_data.close_device_flag   = 0;
-		boot_data.check_boot_flag     = 0;
-		boot_data.field_return        = 0;
-		boot_data.prod_close_sequence = seq;
-		oot_data.extra_cmds           = 0;
-	    rc = bootdata_write(&boot_data);
-	}
-
-	if (prod_close_sequence == 2) {
-		fuse_device  = true;
-		close_device = false;
-		field_return = false;
-		check_boot   = false;
-		reset_after  = true;
-		extra_cmds   = 0;
-	}	
-	else if (prod_close_sequence == 1) {
-		fuse_device  = false;
-		close_device = true;
-		field_return = false;
-		check_boot   = false;
-		reset_after  = false;
-		extra_cmds   = 0;
-	}	
-
-
+	unsigned char boot_count = boot_data.boot_count;
 	if (smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET))
 	{
+		printf("Power fail detected\n");
 		env_set("power_fail", "1");
 		while (read_pflatch_count < 3 && smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET))
 		{
@@ -399,25 +451,104 @@ int board_late_init(void)
 			read_pflatch_count++;
 		}
 	}
-	else
+	else if (boot_count < BOOT_COUNTER_LIMIT)
 	{
-		if (boot_data.boot_count < BOOT_COUNTER_LIMIT)
-		{
-			boot_data.boot_count++;
-		}
+		boot_count++;
 	}
 
-	sprintf(boot_count_str, "%d", boot_data.boot_count);
-	env_set("bootcounter", boot_count_str);
-	sprintf(boot_count_str, "%d", BOOT_COUNTER_LIMIT);
-	env_set("bootcounterlimit", boot_count_str);
+	env_set_ulong("bootcounter", boot_count);
+	env_set_ulong("bootcounterlimit", BOOT_COUNTER_LIMIT);
 	
 	boot_cause = get_imx_reset_cause();
-	sprintf(boot_cause_str, "%09x", boot_cause); //we only want the 9 LSBs - bits 10-31 are reserved
-	env_set("boot_cause", boot_cause_str);
+	sprintf(buf, "%09x", boot_cause); //we only want the 9 LSBs - bits 10-31 are reserved
+	env_set("boot_cause", buf);
 
+	if (mmc_boot_dev != 1 && imx_hab_is_enabled() && (boot_data.ignore_dev_board != 0 || !smp_is_dev_board(false)))
+	{
+		// Disable the boot menu
+		env_set("bootdelay", "-2");
+		env_set("bootmenu_show", "0");
 
-    hab_late_init(fuse_device, close_device, check_boot, field_return, reset_after, extra_cmds);
+		env_set("try_boot_mmc1", "no");
+		env_set("try_boot_mmc1", "no");
+	}
+
+	// JTAG + HAB lock
+	bool bReset = false;
+
+	// HAB
+    uint8_t prod_close_sequence = 0;
+	bool fuse_device  = false;
+	bool close_device = false;
+	bool check_boot  = false;
+	bool field_return = false;
+	bool reset_after = false;
+
+	if (mmc_boot_dev == 2)
+	{
+		fuse_device         = boot_data.fuse_device_flag  ? true : false;
+		close_device        = boot_data.close_device_flag ? true : false;
+		check_boot          = boot_data.check_boot_flag   ? true : false;
+		field_return        = boot_data.field_return_flag ? true : false;
+		prod_close_sequence = boot_data.prod_close_sequence;
+		
+		// Sanity check.
+		if (prod_close_sequence > 2) 
+		{
+			prod_close_sequence = 2;
+		}
+
+		if (fuse_device || close_device || check_boot || field_return || prod_close_sequence) 
+		{
+			uint8_t seq = prod_close_sequence;
+
+			if (seq)
+				seq--;
+
+			boot_data.fuse_device_flag = 0;
+			boot_data.close_device_flag = 0;
+			boot_data.check_boot_flag = 0;
+			boot_data.field_return_flag = 0;
+			boot_data.prod_close_sequence = seq;
+			rc = bootdata_write(&boot_data);
+		}
+
+		if (prod_close_sequence == 2) 
+		{
+			fuse_device = true;
+			close_device = false;
+			field_return = false;
+			check_boot = false;
+			reset_after = true;
+		}	
+		else if (prod_close_sequence == 1) 
+		{
+			fuse_device = false;
+			close_device = true;
+			field_return = false;
+			check_boot = false;
+			reset_after = false;
+		}	
+	}
+
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
+    hab_late_init(fuse_device, close_device, check_boot, field_return, reset_after, 0);
+#else
+	hab_late_init(false, false, false, false, false, 0);
+#endif
+
+	if (hab_late_init(&boot_data) > 0)
+		bReset = true;
+
+	rc = bootdata_compare_write(&boot_data);
+	if (rc < 0)
+	{
+		printf("Error writing bootdata.bin\n");
+	}
+	else if (bReset)
+	{	
+		do_reset(NULL, 0, 0, NULL);
+	}
 #endif	
 
 	return 0;
@@ -539,31 +670,37 @@ U_BOOT_CMD(check_force_rescue, 2, 0, do_check_force_rescue,
 int do_save_boot_data(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct eaton_boot_data_struct boot_data = {0};
-	int rc = -1;
-
 	if (argc < 2)
 	{
 		printf("Insufficient input arguments\n");
-		return -1;
+		return CMD_RET_USAGE;
 	}
 
-	rc = bootdata_read(&boot_data);
-	if (rc != 0)
+	int rc = bootdata_read(&boot_data);
+	if (rc < 0)
 	{
 		printf("Error reading bootdata.bin\n");
 		memset(&boot_data, 0, sizeof(boot_data));
 	}
 
-	boot_data.boot_count = (u8)simple_strtoul(argv[1], NULL, 10);
-
-	rc = bootdata_write(&boot_data);
-	if (rc != 0)
+	unsigned char boot_count = (u8)simple_strtoul(argv[1], NULL, 10);
+	if (boot_count != boot_data.boot_count)
 	{
-		printf("Error writing bootdata.bin\n");
-		memset(&boot_data, 0, sizeof(boot_data));
+		boot_data.boot_count = boot_count;
+		rc = bootdata_write(&boot_data);
+		if (rc < 0)
+		{
+			printf("Error writing bootdata.bin\n");
+			return CMD_RET_FAILURE;
+		}
+		printf("Boot counter saved: %d\n", boot_count);
 	}
-
-	return rc;
+	else
+	{
+		printf("Boot counter is already at %d\n", boot_count);
+	}
+	
+	return CMD_RET_SUCCESS;
 }
 
 U_BOOT_CMD(save_boot_data, 2, 0, do_save_boot_data,

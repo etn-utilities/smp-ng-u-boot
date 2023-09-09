@@ -42,10 +42,14 @@ char *display_options_get_banner(bool newlines, char *buf, int size)
 
 int display_options(void)
 {
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
+	printf("U-Boot\n\n");
+#else
 	char buf[DISPLAY_OPTIONS_BANNER_LENGTH];
 
 	display_options_get_banner(true, buf, sizeof(buf));
 	printf("%s", buf);
+#endif	
 
 	return 0;
 }

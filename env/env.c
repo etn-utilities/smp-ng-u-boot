@@ -178,7 +178,7 @@ int env_load(void)
 		if (!env_has_inited(drv->location))
 			continue;
 
-		printf("Loading Environment from %s... ", drv->name);
+		printf("Loading Environment from %s... ", drv->name != NULL ? drv->name : "built-in defaults");
 		/*
 		 * In error case, the error message must be printed during
 		 * drv->load() in some underlying API, and it must be exactly
@@ -228,7 +228,7 @@ int env_reload(void)
 	if (drv) {
 		int ret;
 
-		printf("Loading Environment from %s... ", drv->name);
+		printf("Loading Environment from %s... ", drv->name != NULL ? drv->name : "built-in defaults");
 
 		if (!env_has_inited(drv->location)) {
 			printf("not initialized\n");

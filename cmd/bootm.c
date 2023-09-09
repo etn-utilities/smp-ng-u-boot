@@ -87,9 +87,6 @@ static int do_bootm_subcommand(struct cmd_tbl *cmdtp, int flag, int argc,
 	return ret;
 }
 
-extern bool smp_is_dev_board(void);
-extern bool imx_hab_is_enabled(void);
-
 /*******************************************************************/
 /* bootm - boot application image from image in memory */
 /*******************************************************************/
@@ -131,7 +128,7 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 #ifdef CONFIG_IMX_HAB
 	extern int authenticate_image(
 			uint32_t ddr_start, uint32_t raw_image_size);
-	bool valid = false;
+
 #ifdef CONFIG_IMX_OPTEE
 	ulong tee_addr = 0;
 	int ret;
@@ -140,7 +137,7 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	tee_addr = env_get_ulong("tee_addr", 16, tee_addr);
 	if (!tee_addr) {
 		printf("Not valid tee_addr, Please check\n");
-		goto skip;
+		return 1;
 	}
 
 	switch (genimg_get_format((const void *)tee_addr)) {
@@ -148,21 +145,21 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		if (authenticate_image(tee_addr,
 		       image_get_image_size((image_header_t *)tee_addr)) != 0) {
 		       printf("Authenticate uImage Fail, Please check\n");
-		       goto skip;
+		       return 1;
 		}
 		break;
 	default:
 		printf("Not valid image format for Authentication, Please check\n");
-		goto skip;
+		return 1;
 	};
 
 	ret = bootz_setup(image_load_addr, &zi_start, &zi_end);
 	if (ret != 0)
-		goto skip;
+		return 1;
 
 	if (authenticate_image(image_load_addr, zi_end - zi_start) != 0) {
 		printf("Authenticate zImage Fail, Please check\n");
-		goto skip;
+		return 1;
 	}
 
 #else
@@ -173,7 +170,7 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		if (authenticate_image(image_load_addr,
 			image_get_image_size((image_header_t *)image_load_addr)) != 0) {
 			printf("Authenticate uImage Fail, Please check\n");
-			goto skip;
+			return 1;
 		}
 		break;
 #endif
@@ -193,7 +190,7 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
                        /* authenticate_image takes care of alignment, pad included in totalsize */
                        if (authenticate_image(image_load_addr, size) != 0) {
                                printf("Authenticate FIT image fail, please check\n");
-                               goto skip;
+                               return 1;
                        }
                }
                break;
@@ -201,14 +198,9 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 
 	default:
 		printf("Not valid image format for Authentication, Please check\n");
-		goto skip;
-	}
-#endif
-	valid = true;
-skip:
-	if (!valid && imx_hab_is_enabled() && !smp_is_dev_board()) {
 		return 1;
 	}
+#endif
 #endif
 
 	return do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START |

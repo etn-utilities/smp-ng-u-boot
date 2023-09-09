@@ -523,8 +523,7 @@ static int fs_read_lmb_check(const char *filename, ulong addr, loff_t offset,
 }
 #endif
 
-static int _fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
-		    int do_lmb_check, loff_t *actread)
+int _fs_read(const char *filename, ulong addr, loff_t offset, loff_t len, int do_lmb_check, loff_t *actread)
 {
 	struct fstype_info *info = fs_get_info(fs_type);
 	void *buf;

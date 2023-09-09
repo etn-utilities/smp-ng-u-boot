@@ -370,7 +370,7 @@ void fastboot_setup(void)
 
 	if (!env_get("serial#")) {
 		get_board_serial(&serialnr);
-		sprintf(serial, "%08x%08x", serialnr.high, serialnr.low);
+		sprintf(serial, "%08X%08X", serialnr.high, serialnr.low);
 		env_set("serial#", serial);
 	}
 

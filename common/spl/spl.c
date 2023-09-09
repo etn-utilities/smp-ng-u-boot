@@ -863,9 +863,14 @@ void preloader_console_init(void)
 	gd->have_console = 1;
 
 #if CONFIG_IS_ENABLED(BANNER_PRINT)
-	puts("\nU-Boot " SPL_TPL_NAME " " PLAIN_VERSION " (" U_BOOT_DATE " - "
-	     U_BOOT_TIME " " U_BOOT_TZ ")\n");
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
+	puts("\nU-Boot " SPL_TPL_NAME "\n");
+#else
+	puts("\nU-Boot " SPL_TPL_NAME " " PLAIN_VERSION " (" U_BOOT_DATE " - " U_BOOT_TIME " " U_BOOT_TZ ")\n");
 #endif
+#endif
+
+
 #ifdef CONFIG_SPL_DISPLAY_PRINT
 	spl_display_print();
 #endif
