@@ -153,6 +153,7 @@
 	"mmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"${kernelargs} " \
+		"${cma_size} " \
 		"root=${mmcroot} rootwait rw " \
 		"rootfstype=${mmcrootfstype} " \
 		"boot_type=${boot_type} " \
@@ -161,6 +162,7 @@
 	"emmcargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"${kernelargs} " \
+		"${cma_size} " \
 		"boot_type=${boot_type} " \
 		"boot_cause=${boot_cause} " \
 		"power_fail=${power_fail} " \
@@ -179,6 +181,10 @@
 			"dcache flush; " \
 		"fi; " \
 		"bootaux ${m4_addr};\0" \
+	"ramsize_check="\
+		"if test $sdram_size -gt 2048; then " \
+			"setenv cma_size cma=320M@-1024M; " \
+		"fi;\0" \
 	"mmcboot=echo Booting from MMC${mmcdev} ...; " \
 		"mmc dev ${mmcdev}; " \
 		"if test -e mmc ${mmcdev} ${bootdir}/${image}; then " \
@@ -256,6 +262,7 @@
 		"\0" \
 
 #define CONFIG_BOOTCOMMAND \
+	"run ramsize_check; " \
 	"if mmc dev ${bootmmcdev} && mmc rescan; then " \
 		"if test ${bootmmcdev} = ${mmcdev}; then " \
 			"if mmc dev ${emmcdev} && test ${try_boot_mmc2} = yes && test -e mmc ${emmcdev}:${part_store} /try-boot-mmc2; then " \
