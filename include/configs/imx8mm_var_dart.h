@@ -183,9 +183,10 @@
 		"bootaux ${m4_addr};\0" \
 	"ramsize_check="\
 		"if test $sdram_size -gt 2048; then " \
-			"setenv cma_size cma=320M@-1024M; " \
+			"setenv cma_size cma=320M@-2048M; " \
 		"fi;\0" \
 	"mmcboot=echo Booting from MMC${mmcdev} ...; " \
+		"run ramsize_check; " \
 		"mmc dev ${mmcdev}; " \
 		"if test -e mmc ${mmcdev} ${bootdir}/${image}; then " \
 			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image}; then " \
@@ -219,6 +220,7 @@
 		"fi; " \
 		"\0" \
 	"emmcboot=echo Booting from MMC${emmcdev} ...; " \
+		"run ramsize_check; " \
 		"mmc dev ${emmcdev}; " \
 		"if test -e mmc ${emmcdev}:${part_kexec} /boot/kernel.bin; then " \
 			"load mmc ${emmcdev}:${part_kexec} ${img_addr} /boot/kernel.bin; " \
@@ -262,7 +264,6 @@
 		"\0" \
 
 #define CONFIG_BOOTCOMMAND \
-	"run ramsize_check; " \
 	"if mmc dev ${bootmmcdev} && mmc rescan; then " \
 		"if test ${bootmmcdev} = ${mmcdev}; then " \
 			"if mmc dev ${emmcdev} && test ${try_boot_mmc2} = yes && test -e mmc ${emmcdev}:${part_store} /try-boot-mmc2; then " \
