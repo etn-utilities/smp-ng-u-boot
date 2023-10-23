@@ -203,6 +203,7 @@
 		"elif test -e mmc ${mmcdev} ${bootdir}/fitImage; then " \
 			"if load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/fitImage; then " \
 				"run mmcargs; " \
+	                        "setenv loadaddr ${img_addr}; " \
 				"bootm ${img_addr}; " \
 			"else " \
 				"echo Failed to load ${bootdir}/fitImage; " \
@@ -214,6 +215,7 @@
 		"if test -e mmc ${emmcdev}:${part_system} /boot/${boot_type}/kernel.bin; then " \
 			"load mmc ${emmcdev}:${part_system} ${img_addr} /boot/${boot_type}/kernel.bin; " \
 			"run emmcargs; " \
+	                "setenv loadaddr ${img_addr}; "	      \
 			"bootm ${img_addr}; " \
 		"else " \
 			"echo No kernel found in /boot/${boot_type}; " \
@@ -225,6 +227,7 @@
 		"if test -e mmc ${emmcdev}:${part_kexec} /boot/kernel.bin; then " \
 			"load mmc ${emmcdev}:${part_kexec} ${img_addr} /boot/kernel.bin; " \
 			"run emmcargs; " \
+                        "setenv loadaddr ${img_addr}; " \
 			"bootm ${img_addr}; " \
 		"elif test ${force_rescue} != 0; then " \
 			"save_boot_data ${bootcounterlimit}; " \

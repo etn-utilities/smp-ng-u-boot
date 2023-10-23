@@ -179,6 +179,23 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		/* Do this authentication in boota command */
 		break;
 #endif
+#ifdef CONFIG_FIT
+       case IMAGE_FORMAT_FIT:
+               /* NOTE: image_load_addr is the value of 'loadaddr' env var,
+                 not necessarily the actual place the image is loaded! So always load
+                 at $loadaddr. */
+               {
+                       uint32_t size;
+                       size = fdt_totalsize((const void *)image_load_addr);
+                       /* authenticate_image takes care of alignment, pad included in totalsize */
+                       if (authenticate_image(image_load_addr, size) != 0) {
+                               printf("Authenticate FIT image fail, please check\n");
+                               return 1;
+                       }
+               }
+               break;
+#endif
+
 	default:
 		printf("Not valid image format for Authentication, Please check\n");
 		return 1;
