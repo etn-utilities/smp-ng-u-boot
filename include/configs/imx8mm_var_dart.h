@@ -151,6 +151,7 @@
 	"force_rescue=0\0" \
 	"power_fail=0\0" \
 	"mmcargs=setenv bootargs console=${console} " \
+		"earlycon=ec_imx6q,0x30860000,115200 " \
 		"${optargs} " \
 		"${kernelargs} " \
 		"${cma_size} " \
@@ -160,6 +161,7 @@
 		KERNEL_EXTRA_ARGS \
 		"\0" \
 	"emmcargs=setenv bootargs console=${console} " \
+		"earlycon=ec_imx6q,0x30860000,115200 " \
 		"${optargs} " \
 		"${kernelargs} " \
 		"${cma_size} " \
@@ -224,12 +226,7 @@
 	"emmcboot=echo Booting from MMC${emmcdev} ...; " \
 		"run ramsize_check; " \
 		"mmc dev ${emmcdev}; " \
-		"if test -e mmc ${emmcdev}:${part_kexec} /boot/kernel.bin; then " \
-			"load mmc ${emmcdev}:${part_kexec} ${img_addr} /boot/kernel.bin; " \
-			"run emmcargs; " \
-                        "setenv loadaddr ${img_addr}; " \
-			"bootm ${img_addr}; " \
-		"elif test ${force_rescue} != 0; then " \
+		"if test ${force_rescue} != 0; then " \
 			"save_boot_data ${bootcounterlimit}; " \
 			"echo Booting in rescue mode (button); " \
 			"setenv boot_type ses; " \
@@ -254,6 +251,12 @@
 			"save_boot_data ${bootcounter}; " \
 			"echo Booting in primary mode (counter=${bootcounter}); " \
 			"setenv boot_type sep; " \
+		"fi; " \
+		"if test -e mmc ${emmcdev}:${part_kexec} /boot/kernel.bin; then " \
+			"load mmc ${emmcdev}:${part_kexec} ${img_addr} /boot/kernel.bin; " \
+			"run emmcargs; " \
+                        "setenv loadaddr ${img_addr}; " \
+			"bootm ${img_addr}; " \
 		"fi; " \
 		"run emmcboot2; " \
 		"echo Booting in rescue mode (${boot_type} failed);" \
