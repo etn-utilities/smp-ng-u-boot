@@ -750,7 +750,7 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 
 #if defined(CONFIG_SPL_WATCHDOG) && defined(CONFIG_HW_WATCHDOG) 
 	hw_watchdog_init();
-	puts("       Watchdog enabled\n");
+	puts("Watchdog enabled\n");
 	WATCHDOG_RESET();
 #endif
 
