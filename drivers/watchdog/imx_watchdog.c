@@ -82,8 +82,15 @@ static void imx_watchdog_init(struct watchdog_regs *wdog, bool ext_reset,
 #ifdef CONFIG_FSL_LSCH2
 	wcr = (WCR_WDA | WCR_SRS | WCR_WDE) << 8 | timeout;
 #else
+#if 1
+	/* Remove WDT_WDBG, it somehow devide timeout by 2 */
+	/* That bit isn't used in the Linux driver. */
+	wcr = WCR_WDZST | WCR_WDE | WCR_SRS |
+		WCR_WDA | SET_WCR_WT(timeout);
+#else
 	wcr = WCR_WDZST | WCR_WDBG | WCR_WDE | WCR_SRS |
 		WCR_WDA | SET_WCR_WT(timeout);
+#endif
 	if (ext_reset)
 		wcr |= WCR_WDT;
 #endif /* CONFIG_FSL_LSCH2*/
