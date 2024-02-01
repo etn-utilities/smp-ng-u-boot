@@ -36,6 +36,7 @@
 #include <fdt_support.h>
 #include <bootcount.h>
 #include <wdt.h>
+#include <watchdog.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -745,6 +746,12 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 
 #if CONFIG_IS_ENABLED(BOARD_INIT)
 	spl_board_init();
+#endif
+
+#if defined(CONFIG_SPL_WATCHDOG) && defined(CONFIG_HW_WATCHDOG) 
+	hw_watchdog_init();
+	puts("       Watchdog enabled\n");
+	WATCHDOG_RESET();
 #endif
 
 #if defined(CONFIG_SPL_WATCHDOG) && CONFIG_IS_ENABLED(WDT)
