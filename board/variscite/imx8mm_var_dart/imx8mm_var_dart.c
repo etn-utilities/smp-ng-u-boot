@@ -279,8 +279,8 @@ static int bootdata_compare_write(const struct eaton_boot_data_struct *boot_data
 	return bootdata_write(boot_data);
 }
 
-extern void hab_late_init(bool fuse_device, bool close_device, bool check_boot, bool field_return, bool reset_after, uint8_t extra_cmds);
-extern bool imx_hab_is_required(void);
+extern bool jtag_is_locked(void);
+extern int jtag_lock(void);
 extern int hab_late_init(struct eaton_boot_data_struct *boot_data);
 extern bool imx_hab_is_enabled(void);
 
@@ -476,66 +476,26 @@ int board_late_init(void)
 	// JTAG + HAB lock
 	bool bReset = false;
 
-	// HAB
-    uint8_t prod_close_sequence = 0;
-	bool fuse_device  = false;
-	bool close_device = false;
-	bool check_boot  = false;
-	bool field_return = false;
-	bool reset_after = false;
-
-	if (mmc_boot_dev == 2)
+	if (boot_data.debug_prog_fuses == 0)
 	{
-		fuse_device         = boot_data.fuse_device_flag  ? true : false;
-		close_device        = boot_data.close_device_flag ? true : false;
-		check_boot          = boot_data.check_boot_flag   ? true : false;
-		field_return        = boot_data.field_return_flag ? true : false;
-		prod_close_sequence = boot_data.prod_close_sequence;
-		
-		// Sanity check.
-		if (prod_close_sequence > 2) 
+		if (jtag_is_locked())
 		{
-			prod_close_sequence = 2;
+			boot_data.lock_jtag = BOOT_DATA_ACTION_SUCCESS;
 		}
-
-		if (fuse_device || close_device || check_boot || field_return || prod_close_sequence) 
-		{
-			uint8_t seq = prod_close_sequence;
-
-			if (seq)
-				seq--;
-
-			boot_data.fuse_device_flag = 0;
-			boot_data.close_device_flag = 0;
-			boot_data.check_boot_flag = 0;
-			boot_data.field_return_flag = 0;
-			boot_data.prod_close_sequence = seq;
-			rc = bootdata_write(&boot_data);
-		}
-
-		if (prod_close_sequence == 2) 
-		{
-			fuse_device = true;
-			close_device = false;
-			field_return = false;
-			check_boot = false;
-			reset_after = true;
-		}	
-		else if (prod_close_sequence == 1) 
-		{
-			fuse_device = false;
-			close_device = true;
-			field_return = false;
-			check_boot = false;
-			reset_after = false;
-		}	
 	}
 
-#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
-    hab_late_init(fuse_device, close_device, check_boot, field_return, reset_after, 0);
-#else
-	hab_late_init(false, false, false, false, false, 0);
-#endif
+	if (boot_data.lock_jtag == BOOT_DATA_ACTION_EXEC)
+	{		
+		if (jtag_lock() == 0)
+		{
+			boot_data.lock_jtag = BOOT_DATA_ACTION_SUCCESS;
+			bReset = true;
+		}
+		else
+		{
+			boot_data.lock_jtag = BOOT_DATA_ACTION_FAILED;
+		}
+	}
 
 	if (hab_late_init(&boot_data) > 0)
 		bReset = true;

@@ -528,6 +528,12 @@ static fuse_prog_t const imx_field_return_fuse = {
 	.value = 1
 };
 
+static fuse_prog_t const imx_lock_jtag_fuse = {
+	.bank = 1,
+	.word = 3,
+	.value = 0x00E00000		// 0x470[21] 1 - Secure JTAG Controller is disabled, 0x470[23:22] 11 - No debug mode
+};
+
 #define BOOTARG_HAB_DEVICE_CLOSED                   "hab_device_closed"                   // 1 if hab device has been closed/secured, 0 otherwise
 #define BOOTARG_HAB_FUSE_PROGRAMMED                 "hab_fuse_programmed"                 // 1 if fuse hasn't been programmed yet, 0 if programmed
 #define BOOTARG_HAB_FUSE_CONTENT_CORRECT            "hab_fuse_content_correct"            // 1 if fuse has been programmed with correct content, 0 otherwise
@@ -536,12 +542,7 @@ static fuse_prog_t const imx_field_return_fuse = {
 #define BOOTARG_HAB_DEVICE_FIELD_RETURN_LOCKED      "hab_device_field_return_locked"      // 1 if device field return fuse is locked, 0 otherwise
 #define BOOTARG_IS_DEV_BOARD                        "is_dev_board"                        // 1 if this system is a dev board.
 #define BOOTARG_DEVICE_REVOCATION_BITS              "hab_device_revocation_bits"          // First 4 bits of the SRK_REVOKE register
-
-static enum hab_boot_check_results s_hab_boot_check_cmd_result = HAB_BOOT_CHECK_RESULT_NO_RESULT;
-static enum hab_fuse_prog_results s_hab_fuse_prog_cmd_result = HAB_FUSE_PROG_RESULT_NO_RESULT;
-static enum hab_device_close_results s_hab_device_close_cmd_result = HAB_DEVICE_CLOSE_RESULT_NO_RESULT;
-static enum hab_device_field_return_results s_hab_device_field_return_cmd_result = HAB_DEVICE_FIELD_RETURN_RESULT_NO_RESULT;
-static uint8_t s_extra_cmds;
+#define BOOTARG_JTAG_LOCKED                         "jtag_locked"                         // 1 if the JTAG port is locked
 
 #define EXTRA_CMD_VALID         	     	(1 << 7) // Other bits are to be taken into consideration if set 
 #define EXTRA_CMD_DEVICE_FUSE_FORCE 	    (1 << 0) // Device fuse state to force if EXTRA_CMD_VALID
@@ -646,6 +647,17 @@ static bool hab_sig_valid(uint32_t *count)
 	return valid;
 }
 
+bool jtag_is_locked(void)
+{
+	bool isLocked = false;
+	u32 value;
+
+	fuse_read(imx_lock_jtag_fuse.bank, imx_lock_jtag_fuse.word, &value);
+	if ((value & imx_lock_jtag_fuse.value) == imx_lock_jtag_fuse.value) {
+		isLocked = true;
+	}
+	return isLocked;
+}
 
 void get_security_state_str(bool device_closed, bool field_return, bool boot_sig_valid, int dev_board, char* buffer, size_t buffer_size) 
 {
@@ -842,6 +854,7 @@ static int create_stats_and_bootargs(void)
 	char  srk_revoke_str[128];
 	uint32_t srk_revoke_bits;
 	char  security_state_str[128];
+	bool  is_jtag_locked;
 
 	device_closed         = imx_hab_is_enabled();
 	fuse_programmed       = hab_fuse_programmed();
@@ -856,6 +869,7 @@ static int create_stats_and_bootargs(void)
  	sig_valid    = hab_sig_valid(&event_count);
     uid          = smp_board_serial();
 	is_dev_board = hab_is_dev_board(false);
+	is_jtag_locked = jtag_is_locked();
 
 	struct hab_hdr *hdr = (struct hab_hdr *)HAB_RVT_BASE;
 
@@ -898,6 +912,7 @@ static int create_stats_and_bootargs(void)
     smp_stats_add_str("Config", DEBUG_STATS_LEVEL, "hab_config", config_str);
     smp_stats_add_uint32_t("Config value", DEBUG_STATS_LEVEL, "hab_config_value", config);
     smp_stats_add_bool("Config secure", DEBUG_STATS_LEVEL, "hab_config_secure", config_secure);    
+    smp_stats_add_bool("JTAG locked", DEBUG_STATS_LEVEL, "jtag_locked", is_jtag_locked);    
     smp_stats_end();
 
     env_set_ulong(BOOTARG_HAB_DEVICE_CLOSED, device_closed ? 1 : 0);
@@ -2012,10 +2027,40 @@ int authenticate_image(u32 ddr_start, u32 raw_image_size)
 	return imx_hab_authenticate_image(ddr_start, bytes, ivt_offset, false);
 }
 
-void hab_late_init(bool fuse_device, bool close_device, bool check_boot, bool field_return, bool reset_after, uint8_t extra_cmds)
+int jtag_lock(void)
 {
-#ifndef CONFIG_SPL_BUILD	
+	//Note: Must be called before hab_late_init
+    //Note: create_stats_and_bootargs() called in hab_late_init;
 
+#ifndef CONFIG_SPL_BUILD	
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
+	if (jtag_is_locked())
+	{
+		log_print(true, "JTAG_FUSE: WARNING: Already locked");	
+		return 0;
+	}
+
+	fuse_prog(imx_lock_jtag_fuse.bank, imx_lock_jtag_fuse.word, imx_lock_jtag_fuse.value);
+	
+	if (force_fuse_refresh() != 0) 
+	{
+		log_print(true, "JTAG_FUSE: WARNING: Cannot refresh fuse registers!");	
+	}		
+
+	if (!jtag_is_locked()) 
+	{
+		log_print(true, "JTAG_FUSE: ERROR: Cannot program fuses (%x)!", imx_lock_jtag_fuse.value);
+		return -1;
+	}
+
+	log_print(true, "JTAG_FUSE: SUCCESS: Fuses programmed with success.");
+#endif
+#endif
+
+	return 0;
+}
+
+#ifndef CONFIG_SPL_BUILD
 int hab_late_init(struct eaton_boot_data_struct *boot_data)
 {	
     // Keep this code here as the following run_command() can generate events when testing for boot validity	
