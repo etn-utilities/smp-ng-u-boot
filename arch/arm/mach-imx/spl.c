@@ -297,7 +297,7 @@ __weak void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image)
 		offset = spl_image->size - CONFIG_CSF_SIZE;
 		if (!imx_hab_authenticate_image(spl_image->load_addr,
 						offset + IVT_SIZE +
-						CSF_PAD_SIZE, offset)) {
+						CSF_PAD_SIZE, offset, false)) {
 			image_entry();
 		} else {
 			panic("spl: ERROR:  image authentication fail\n");
@@ -440,7 +440,7 @@ void board_spl_fit_post_load(const void *fit, struct spl_image_info *spl_image)
 
 		if (imx_hab_authenticate_image((uintptr_t)fit,
 					       offset + IVT_SIZE + CSF_PAD_SIZE,
-					       offset)) {
+					       offset, false)) {
 			panic("spl: ERROR:  image authentication unsuccessful\n");
 		}
 	}

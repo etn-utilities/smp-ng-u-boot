@@ -750,7 +750,7 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 
 #if defined(CONFIG_SPL_WATCHDOG) && defined(CONFIG_HW_WATCHDOG) 
 	hw_watchdog_init();
-	puts("       Watchdog enabled\n");
+	puts("Watchdog enabled\n");
 	WATCHDOG_RESET();
 #endif
 
@@ -863,9 +863,14 @@ void preloader_console_init(void)
 	gd->have_console = 1;
 
 #if CONFIG_IS_ENABLED(BANNER_PRINT)
-	puts("\nU-Boot " SPL_TPL_NAME " " PLAIN_VERSION " (" U_BOOT_DATE " - "
-	     U_BOOT_TIME " " U_BOOT_TZ ")\n");
+#if defined(SMP_OFFICIAL_VERSION) && SMP_OFFICIAL_VERSION != 0
+	puts("\nU-Boot " SPL_TPL_NAME "\n");
+#else
+	puts("\nU-Boot " SPL_TPL_NAME " " PLAIN_VERSION " (" U_BOOT_DATE " - " U_BOOT_TIME " " U_BOOT_TZ ")\n");
 #endif
+#endif
+
+
 #ifdef CONFIG_SPL_DISPLAY_PRINT
 	spl_display_print();
 #endif
