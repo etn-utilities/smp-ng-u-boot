@@ -452,7 +452,7 @@ int board_late_init(void)
 		printf("error reading from nand boot\n");
 		return -1;
 	}
-	sprintf(reset_flag_str, "%d", boot_data.reset_flag);
+	sprintf(reset_flag_str, "%d", boot_data.factory_reset);
 	env_set("resetflag", reset_flag_str);
 
 	boot_count = 255 - boot_data.boot_count;
@@ -608,7 +608,7 @@ int do_save_boot_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	read_nand_boot_data(&boot_data);
 
 	boot_data.boot_count = boot_count > 255 ? 0 : 255 - (u8)boot_count;
-	boot_data.reset_flag = reset_flag > 255 ? 255 : (u8)reset_flag;
+	boot_data.factory_reset = reset_flag > 255 ? 255 : (u8)reset_flag;
 
 	rc = write_nand_boot_data(&boot_data);
 	if (rc < 0) {
