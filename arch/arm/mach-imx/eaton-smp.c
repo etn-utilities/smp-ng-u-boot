@@ -35,11 +35,34 @@ static int stats_index = 0;
 //
 uint64_t dev_board_uid_list[] = {
 	0x232529AAC2A3784A, // Mario wrong keys
-	0x1415B209DAB6FAD9, // DB ptorotype 2GB RAM	
-	//0x102821AAC2A3784A, // DB
-	0x222729AAC2A3784A, // 11000037 - AB
-	0x2B1919AAC654D589, // 11000087 - AB
-	0x232629AAC2A3784A, // 11000035 - FO first locked SOM
+
+	0x240829AAC2A3784A, // 11000001   Picotte, Alain
+	0x181A7209DABA6026, // 11000008   Anthony Ciccozzi
+	0x113021AAC2A3784A, // 11000011   Bilodeau, Hugues
+	0x0E2329AAC654D0C5, // 11000017   Picotte, Alain
+	0x230229AAC2A3784A, // 11000020   Anthony Ciccozzi
+	0x250329AAC2A3784A, // 11000021   Mojidra, Shweta
+	0x251129AAC2A3784A, // 11000023   Ansari, Mateen
+	0x290619AAC2A3784A, // 11000025   Johnson, Justin
+	0x222F29AAC2A3784A, // 11000026   Mojidra, Shweta
+	0x100521AAC2A3784A, // 11000028   Mojidra, Shweta
+	0x19187209DABA6026, // 11000029   Anthony Ciccozzi
+	0x111F21AAc2A3784A, // 11000033   Leblanc, Jerome
+	0x1415B209DAB6FAD9, // 11000034   Brochu, Dominique
+	0x232629AAC2A3784A, // 11000035   Ouellet, Frederic
+	0x222729AAC2A3784A, // 11000037   Beaulieu, Antony
+	0x232B29AAC2A3784A, // 11000038   Ouellet, Frederic
+	0x113021AAC2A3784A, // 11000057   Picotte, Alain
+	0x190321AAC2A3784A, // 11000059   Bilodeau, Jean-François
+	0x190D21AAC2A3784A, // 11000060   Ashna, Jain
+	0x2B0D11AAC654D589, // 11000086   Dos Santos, Anthony
+	0x2B1919AAC654D589, // 11000087   Beaulieu, Antony
+	0x17314209DABA6026, // 11000090   Dos Santos, Anthony
+	0x0C194209DABA6026, // 11000091   Ouellet, Frederic
+	0x232121AAC2A3784A, // 11000094   Rolle, Sebastien
+	0x232819AAC2A3784A, // 11000095   Rolle, Sebastien
+	0x130C19AAC2A3784A, // 11000101   Anthony Ciccozzi
+	0x221E29AAC2A3784A, // 11000104   Kumar, Kshitij
 
 	0
 };
@@ -138,7 +161,7 @@ int smp_stats_add_hex32(const char *descr, uint32_t level, const char *field, ui
 int smp_stats_add_hex64(const char *descr, uint32_t level, const char *field, uint64_t value)
 {
 	char line[256];
-	snprintf(line, sizeof(line), "{\"name\":\"%s\",\"value\":\"0x%16" PRIX64 "\",\"level\":%u,\"descr\":\"%s\"},", field, value, level, descr);
+	snprintf(line, sizeof(line), "{\"name\":\"%s\",\"value\":\"0x%016" PRIX64 "\",\"level\":%u,\"descr\":\"%s\"},", field, value, level, descr);
 	line[sizeof(line) - 1] = '\0';
     return (smp_stats_append(line));
 }
