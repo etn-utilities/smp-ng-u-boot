@@ -374,7 +374,7 @@ int board_late_init(void)
 #endif
 	var_eeprom_print_prod_info(ep);
 
-	printf("Serial ID: 0x%" PRIX64 " %s\n", smp_board_serial(), smp_is_dev_board(true) ? "(dev)" : "");
+	printf("Serial ID: 0x%016" PRIX64 " %s\n", smp_board_serial(), smp_is_dev_board(true) ? "(dev)" : "");
 
 	som_rev = var_get_som_rev(ep);
 	
