@@ -666,4 +666,21 @@ int do_save_boot_data(struct cmd_tbl *cmdtp, int flag, int argc, char * const ar
 U_BOOT_CMD(save_boot_data, 2, 0, do_save_boot_data,
 			"Save the bootstruct to emmc memory.",
 			"counter\n The maximum value is 0xff or 255");
+
+int do_boot_data_reset(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct eaton_boot_data_struct boot_data = {0};
+	int rc = bootdata_write(&boot_data);
+	if (rc < 0)
+	{
+		printf("Error writing bootdata.bin\n");
+		return CMD_RET_FAILURE;
+	}
+
+	printf("Boot data have been reset\n");
+	
+	return CMD_RET_SUCCESS;
+}
+
+U_BOOT_CMD(boot_data_reset, 1, 0, do_boot_data_reset, "boot_data_reset", "Reset the boot data");
 #endif
