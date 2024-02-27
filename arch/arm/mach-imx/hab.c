@@ -667,7 +667,7 @@ void get_security_state_str(bool device_closed, bool field_return, bool boot_sig
     }
 	else
 	{
-		const char *security_state = field_return ? "Field Return" : (device_closed ? "Secured" : "Insecured");
+		const char *security_state = field_return ? "Field Return" : (device_closed ? "Secured" : "Unsecured");
 		const char *bootloader_signature = boot_sig_valid ? "Valid" : "Invalid";
 		const char *os_verification = dev_board ? "Disabled" : "Enabled";
 		
