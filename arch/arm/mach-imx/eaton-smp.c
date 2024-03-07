@@ -35,7 +35,7 @@ static int stats_index = 0;
 //
 uint64_t dev_board_uid_list[] = {
 	0x232529AAC2A3784A, // Mario wrong keys
-		
+
 	0x240829AAC2A3784A, // 11000001   Picotte, Alain
 	0x242329AAC2A3784A, // 11000003   Picotte, Alain
 	0x140619AAC2A3784A, // 11000006   Robitaille, Pierre
@@ -53,7 +53,7 @@ uint64_t dev_board_uid_list[] = {
 	0x222F29AAC2A3784A, // 11000026   Mojidra, Shweta
 	0x100521AAC2A3784A, // 11000028   Mojidra, Shweta
 	0x19187209DABA6026, // 11000029   Ciccozzi, Anthony
-	0x111F21AAc2A3784A, // 11000033   Leblanc, Jerôme
+	0x111F21AAc2A3784A, // 11000033   Leblanc, Jerome
 	0x1415B209DAB6FAD9, // 11000034   Brochu, Dominique
 	0x232629AAC2A3784A, // 11000035   Ouellet, Frederic
 	0x222729AAC2A3784A, // 11000037   Beaulieu, Antony
@@ -77,6 +77,7 @@ uint64_t dev_board_uid_list[] = {
 	0x232121AAC2A3784A, // 11000094   Rolle, Sebastien
 	0x232819AAC2A3784A, // 11000095   Rolle, Sebastien
 	0x130C19AAC2A3784A, // 11000101   Anthony Ciccozzi
+	0x110C21AAC2A3784A, // 11000102   Benach, Brian
 	0x221E29AAC2A3784A, // 11000104   Kumar, Kshitij
 
 	0
