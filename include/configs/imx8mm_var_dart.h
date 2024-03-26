@@ -43,6 +43,13 @@
 #define KERNEL_EXTRA_ARGS ""
 #endif
 
+#ifdef MACHINE_ARCH_CBC9000
+#define DEFAULT_FDT_FILE "imx8mm-var-dart-cbc9000.dtb"
+#else
+#define DEFAULT_FDT_FILE "imx8mm-var-dart-da3050.dtb"
+#endif
+
+
 /* ENET Config */
 #if defined(CONFIG_FEC_MXC)
 #define CONFIG_ETHPRIME                 "FEC"
@@ -125,7 +132,7 @@
 	"fdt_high=0xffffffffffffffff\0" \
 	"boot_fdt=try\0" \
 	"boot_fit=no\0" \
-	"fdt_file=imx8mm-var-dart-da3050.dtb\0" \
+	"fdt_file=" DEFAULT_FDT_FILE "\0" \
 	"ip_dyn=yes\0" \
 	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)"\0" \
 	"mmcblk=1\0" \
@@ -199,7 +206,7 @@
 			"dcache flush; " \
 		"fi; " \
 		"bootaux ${m4_addr};\0" \
-	"ramsize_check="\
+	"ramsize_check=" \
 		"if test $sdram_size -gt 2048; then " \
 			"setenv cma_size cma=320M@-2048M; " \
 		"fi;\0" \
