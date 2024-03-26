@@ -57,6 +57,34 @@ static int smp_set_gpio_value(int bank_number, int offset, int value);
 
 #define GPIO_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1 | PAD_CTL_PUE | PAD_CTL_PE)
 
+#ifdef MACHINE_ARCH_CBC9000
+
+#define MUX_RESET_GPIO 	IMX_GPIO_NR(5, 28)
+
+static iomux_v3_cfg_t const mux_reset_pads[] = {
+	IMX8MM_PAD_UART4_RXD_GPIO5_IO28 | MUX_PAD_CTRL((PAD_CTL_DSE6 | PAD_CTL_PUE)),
+};
+
+#define ENET1_RESET_GPIO 	IMX_GPIO_NR(1, 6)
+
+static iomux_v3_cfg_t const enet1_reset_pads[] = {
+	IMX8MM_PAD_GPIO1_IO06_GPIO1_IO6 | MUX_PAD_CTRL((PAD_CTL_DSE6 | PAD_CTL_PUE)),
+};
+
+#define DISPLAY_EN_GPIO 	IMX_GPIO_NR(1, 12)
+
+static iomux_v3_cfg_t const display_enable_pads[] = {
+	IMX8MM_PAD_GPIO1_IO12_GPIO1_IO12 | MUX_PAD_CTRL((PAD_CTL_DSE6 | PAD_CTL_PUE)),
+};
+
+#define RS232_EN_GPIO 	IMX_GPIO_NR(1, 15)
+
+static iomux_v3_cfg_t const rs232_enable_pads[] = {
+	IMX8MM_PAD_GPIO1_IO15_GPIO1_IO15 | MUX_PAD_CTRL((PAD_CTL_DSE6 | PAD_CTL_PUE)),
+};
+
+#endif
+
 #ifdef CONFIG_SPL_BUILD
 #define ID_GPIO 	IMX_GPIO_NR(2, 11)
 
@@ -158,7 +186,18 @@ int board_early_init_f(void)
 	if (id == DART_MX8M_MINI) {
 		init_uart_clk(0);
 		imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
-	}else if (id == VAR_SOM_MX8M_MINI) {
+#ifdef MACHINE_ARCH_CBC9000
+		imx_iomux_v3_setup_multiple_pads(mux_reset_pads, ARRAY_SIZE(mux_reset_pads));
+		imx_iomux_v3_setup_multiple_pads(enet1_reset_pads, ARRAY_SIZE(enet1_reset_pads));
+		imx_iomux_v3_setup_multiple_pads(display_enable_pads, ARRAY_SIZE(display_enable_pads));
+		imx_iomux_v3_setup_multiple_pads(rs232_enable_pads, ARRAY_SIZE(rs232_enable_pads));
+
+		gpio_direction_output(MUX_RESET_GPIO, 1);
+		gpio_direction_output(ENET1_RESET_GPIO, 1);
+		gpio_direction_output(DISPLAY_EN_GPIO, 1);
+		gpio_direction_output(RS232_EN_GPIO, 1);
+#endif
+	} else if (id == VAR_SOM_MX8M_MINI) {
 		init_uart_clk(3);
 		mxc_base = (struct mxc_uart *)UART4_BASE_ADDR;
 		imx_iomux_v3_setup_multiple_pads(uart4_pads, ARRAY_SIZE(uart4_pads));
@@ -285,7 +324,7 @@ extern int hab_late_init(struct eaton_boot_data_struct *boot_data);
 extern bool imx_hab_is_enabled(void);
 
 int board_early_check_serial_console(void)
-{	
+{
 	if (mmc_get_env_dev() == 1) // 1: SD Card
 	{
 		printf("Serial console is needed for SD card\n");
@@ -342,7 +381,7 @@ int do_check_bootdata_serial_console(struct cmd_tbl *cmdtp, int flag, int argc, 
 		gd->flags |= GD_FLG_SILENT | GD_FLG_DISABLE_CONSOLE;
 		env_set("silent", "1");
 		return 0;
-	}	
+	}
 
 	return 0;
 }
@@ -368,7 +407,6 @@ int board_late_init(void)
 	extcon_ptn5150_setup(&usb_ptn5150);
 #endif
 
-
 #ifdef CONFIG_FEC_MXC
 	var_setup_mac(ep);
 #endif
@@ -377,7 +415,7 @@ int board_late_init(void)
 	printf("Serial ID: 0x%016" PRIX64 " %s\n", smp_board_serial(), smp_is_dev_board(true) ? "(dev)" : "");
 
 	som_rev = var_get_som_rev(ep);
-	
+
 	snprintf(sdram_size_str, SDRAM_SIZE_STR_LEN, "%d", (int) (gd->ram_size / 1024 / 1024));
 	env_set("sdram_size", sdram_size_str);
 
@@ -458,7 +496,7 @@ int board_late_init(void)
 
 	env_set_ulong("bootcounter", boot_count);
 	env_set_ulong("bootcounterlimit", BOOT_COUNTER_LIMIT);
-	
+
 	boot_cause = get_imx_reset_cause();
 	sprintf(buf, "%09x", boot_cause); //we only want the 9 LSBs - bits 10-31 are reserved
 	env_set("boot_cause", buf);
@@ -485,7 +523,7 @@ int board_late_init(void)
 	}
 
 	if (boot_data.lock_jtag == BOOT_DATA_ACTION_EXEC)
-	{		
+	{
 		if (jtag_lock() == 0)
 		{
 			boot_data.lock_jtag = BOOT_DATA_ACTION_SUCCESS;
@@ -506,10 +544,10 @@ int board_late_init(void)
 		printf("Error writing bootdata.bin\n");
 	}
 	else if (bReset)
-	{	
+	{
 		do_reset(NULL, 0, 0, NULL);
 	}
-#endif	
+#endif
 
 	return 0;
 }
@@ -525,7 +563,7 @@ static int smp_read_gpio_value(int bank_number, int offset)
 	int val = 0;
 	struct udevice *dev = NULL;
 	char buf[80];
-	
+
 	for (ret = uclass_first_device(UCLASS_GPIO, &dev);
 	     dev;
 	     ret = uclass_next_device(&dev)) {
@@ -579,6 +617,7 @@ static int smp_set_gpio_value(int bank_number, int offset, int value)
 
 int do_check_force_rescue(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
+#ifndef MACHINE_ARCH_CBC9000
 	int front_button_value = 1;
 	char *delay_str = NULL;
 	int delay = FORCE_BOOT_RESCUE_DELAY;
@@ -620,10 +659,13 @@ int do_check_force_rescue(struct cmd_tbl *cmdtp, int flag, int argc, char * cons
 		printf("\n");
 
 	return env_set("force_rescue", front_button_value != 0 ? "0" : "1");
+#else
+	return env_set("force_rescue", "0"); // For CBC-9000 Variscite devkit no rescue option.
+#endif
 }
 
 U_BOOT_CMD(check_force_rescue, 2, 0, do_check_force_rescue,
-			"Check if the force-rescue button is pressed before it timeout.\n",
+			"Check if the force-rescue button is pressed before timeout.\n",
 			"timeout\n The timeout in seconds.");
 
 
@@ -659,7 +701,7 @@ int do_save_boot_data(struct cmd_tbl *cmdtp, int flag, int argc, char * const ar
 	{
 		printf("Boot counter is already at %d\n", boot_count);
 	}
-	
+
 	return CMD_RET_SUCCESS;
 }
 
@@ -677,8 +719,8 @@ int do_boot_data_reset(struct cmd_tbl *cmdtp, int flag, int argc, char * const a
 		return CMD_RET_FAILURE;
 	}
 
-	printf("Boot data have been reset\n");
-	
+	printf("Boot data has been reset\n");
+
 	return CMD_RET_SUCCESS;
 }
 
