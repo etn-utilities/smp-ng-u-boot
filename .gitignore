@@ -1,0 +1,103 @@
+#
+# NOTE! Don't add files that are generated in specific
+# subdirectories here. Add them in the ".gitignore" file
+# in that subdirectory instead.
+#
+# Normal rules (sorted alphabetically)
+#
+.*
+*.a
+*.bin
+*.cfgout
+*.dtb
+*.dtb.S
+*.elf
+*.exe
+*.gcda
+*.gcno
+*.i
+*.lex.c
+*.lst
+*.mod.c
+*.o
+*.o.*
+*.order
+*.patch
+*.s
+*.su
+*.swp
+*.tab.[ch]
+
+# Build tree
+/build-*
+
+#
+# Top-level generic files
+#
+fit-dtb.blob
+/MLO*
+/SPL*
+/System.map
+/u-boot*
+/boards.cfg
+
+#
+# git files that we don't want to ignore even it they are dot-files
+#
+!.gitignore
+!.github/
+!.mailmap
+
+#
+# Generated files
+#
+/spl/
+/tpl/
+/defconfig
+
+#
+# Generated include files
+#
+/include/config/
+/include/generated/
+
+# stgit generated dirs
+patches-*
+.stgit-edit.txt
+
+# quilt's files
+patches
+series
+
+# gdb files
+.gdb_history
+
+# cscope files
+cscope.*
+
+# tags files
+/tags
+/ctags
+/etags
+
+# gnu global files
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+
+*.orig
+*~
+\#*#
+singletask.lock
+include/bootdata/bootdata.h
+arch/arm/dts/am335x-io2000-crypto.dtsi
+arch/arm/dts/am335x-io2000-gpio.dtsi
+arch/arm/dts/am335x-io2000-mmc.dts
+arch/arm/dts/am335x-io2000-nand.dtsi
+arch/arm/dts/am335x-io2000-nor.dtsi
+arch/arm/dts/am335x-io2000-pru.dtsi
+arch/arm/dts/am335x-io2000.dts
+arch/arm/dts/am335x-io2000.dtsi
+configs/am335x_io2000_defconfig
+include/environment/pxred/pxred_common.h
