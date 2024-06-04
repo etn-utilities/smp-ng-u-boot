@@ -35,7 +35,10 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 #define BOOT_COUNTER_LIMIT		BOOT_COUNT_LIMIT
-#define FORCE_BOOT_RESCUE_DELAY 5
+#define FORCE_BOOT_RESCUE_DELAY 3
+#define FORCE_BOOT_RESCUE_DEBOUNCE_MS 50
+#define NORMAL_BOOT_BLINK_SPEED 250
+#define RESCUE_BOOT_BLINK_SPEED 50
 
 #define LATCH_GPIO_BANK				4
 #define LATCH_GPIO_OFFSET			1
@@ -43,6 +46,10 @@ DECLARE_GLOBAL_DATA_PTR;
 #define POWER_FAIL_GPIO_OFFSET		11
 #define FRONT_BUTTON_GPIO_BANK		1
 #define FRONT_BUTTON_GPIO_OFFSET	0
+#define FRONT_GREEN_LED_GPIO_BANK	1
+#define FRONT_GREEN_LED_GPIO_OFFSET	13
+#define FRONT_RED_LED_GPIO_BANK		1
+#define FRONT_RED_LED_GPIO_OFFSET	14
 
 #define BOOTDATA_IFACE		"mmc"
 #define BOOTDATA_PART		"2:2"
@@ -323,7 +330,7 @@ extern int jtag_lock(void);
 extern int hab_late_init(struct eaton_boot_data_struct *boot_data);
 extern bool imx_hab_is_enabled(void);
 
-int board_early_check_serial_console(void)
+static int board_early_check_serial_console(void)
 {
 	if (mmc_get_env_dev() == 1) // 1: SD Card
 	{
@@ -396,12 +403,14 @@ U_BOOT_CMD(check_bootdata_serial_console, 1, 0, do_check_bootdata_serial_console
 #define SDRAM_SIZE_STR_LEN 5
 int board_late_init(void)
 {
+#ifndef CONFIG_SPL_BUILD	
 	int som_rev;
 	char sdram_size_str[SDRAM_SIZE_STR_LEN];
 	int id = get_board_id();
 	struct var_eeprom *ep = VAR_EEPROM_DATA;
 	struct var_carrier_eeprom carrier_eeprom;
 	char carrier_rev[CARRIER_REV_LEN] = {0};
+	bool power_fail = false;
 
 #ifdef CONFIG_EXTCON_PTN5150
 	extcon_ptn5150_setup(&usb_ptn5150);
@@ -413,6 +422,23 @@ int board_late_init(void)
 	var_eeprom_print_prod_info(ep);
 
 	printf("Serial ID: 0x%016" PRIX64 " %s\n", smp_board_serial(), smp_is_dev_board(true) ? "(dev)" : "");
+
+	// Check power fail
+	if (smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET))
+	{
+		power_fail = true;
+		printf("Power fail detected\n");
+		env_set("power_fail", "1");
+		for (int read_pflatch_count = 0; read_pflatch_count < 3 && smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET); read_pflatch_count++)
+		{
+			if (smp_set_gpio_value(LATCH_GPIO_BANK, LATCH_GPIO_OFFSET, 1))
+				break;
+
+			udelay(1000);
+		}
+	}
+
+	board_early_check_serial_console();
 
 	som_rev = var_get_som_rev(ep);
 
@@ -461,7 +487,6 @@ int board_late_init(void)
 	char buf[64];
 	int rc = 0;
 	u32 boot_cause;
-	int read_pflatch_count = 0;
 
 	rc = bootdata_read(&boot_data);
 	if (rc < 0)
@@ -475,27 +500,14 @@ int board_late_init(void)
 		printf("This dev board will behave like it was not (ignore_dev_board)\n");
 
 	unsigned char boot_count = boot_data.boot_count;
-	if (smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET))
-	{
-		printf("Power fail detected\n");
-		env_set("power_fail", "1");
-		while (read_pflatch_count < 3 && smp_read_gpio_value(POWER_FAIL_GPIO_BANK, POWER_FAIL_GPIO_OFFSET))
-		{
-			if (smp_set_gpio_value(LATCH_GPIO_BANK, LATCH_GPIO_OFFSET, 1))
-			{
-				return -1;
-			}
-			udelay(1000);
-			read_pflatch_count++;
-		}
-	}
-	else if (boot_count < BOOT_COUNTER_LIMIT)
+	if (!power_fail && boot_count < BOOT_COUNTER_LIMIT)
 	{
 		boot_count++;
 	}
 
 	env_set_ulong("bootcounter", boot_count);
 	env_set_ulong("bootcounterlimit", BOOT_COUNTER_LIMIT);
+	env_set_ulong("factoryreset", boot_data.factory_reset);
 
 	boot_cause = get_imx_reset_cause();
 	sprintf(buf, "%09x", boot_cause); //we only want the 9 LSBs - bits 10-31 are reserved
@@ -548,7 +560,7 @@ int board_late_init(void)
 		do_reset(NULL, 0, 0, NULL);
 	}
 #endif
-
+#endif
 	return 0;
 }
 
@@ -615,15 +627,32 @@ static int smp_set_gpio_value(int bank_number, int offset, int value)
 }
 
 
-int do_check_force_rescue(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+int do_toggle_force_rescue(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
 #ifndef MACHINE_ARCH_CBC9000
-	int front_button_value = 1;
 	char *delay_str = NULL;
+	char *blink_slow_str = NULL;
+	char *blink_fast_str = NULL;
+	char *to_rescue_str = NULL;
 	int delay = FORCE_BOOT_RESCUE_DELAY;
+	int blink_slow = NORMAL_BOOT_BLINK_SPEED;
+	int blink_fast = RESCUE_BOOT_BLINK_SPEED;
+	int to_rescue = 0;
 
 	if (argc >= 2)
-		delay_str = argv[1];
+		to_rescue_str = argv[1];
+
+	if (argc >= 3)
+		delay_str = argv[2];
+
+	if (argc >= 4)
+		blink_slow_str = argv[3];
+
+	if (argc >= 5)
+		blink_fast_str = argv[4];
+
+	if (to_rescue_str)
+		to_rescue = simple_strtol(to_rescue_str, NULL, 10);
 
 	if (!delay_str)
 		delay_str = env_get("forcerescue_delay");
@@ -631,52 +660,129 @@ int do_check_force_rescue(struct cmd_tbl *cmdtp, int flag, int argc, char * cons
 	if (delay_str)
 		delay = (int)simple_strtol(delay_str, NULL, 10);
 
-	if (delay > 0)
-		printf("Press the front panel button to force rescue mode in %d seconds", delay);
+	if (delay <= 0)
+		return 0;
+
+	if (blink_slow_str)
+		blink_slow = (int)simple_strtol(blink_slow_str, NULL, 10);
+
+	if (blink_fast_str)
+		blink_fast = (int)simple_strtol(blink_fast_str, NULL, 10);
 
 	unsigned long timer_start = get_timer(0);
 	unsigned long timer_delay_print = 0;
+	unsigned long timer_delay_blink = 0;	
 	unsigned long timer_delay = 0;
+	unsigned long timer_debounce = 0;
+	
+	int value = smp_read_gpio_value(FRONT_BUTTON_GPIO_BANK, FRONT_BUTTON_GPIO_OFFSET);
+	bool is_pressed = value == 0;
+	bool is_toggled = false;
+	bool current_led_toggle = false;
+
+	printf("Press the front panel button to force rescue mode in %d seconds", delay);
+
 	do
 	{
-		/*
-			* The GPIO is active low and we want to stop looping as soon as it is activated.
-		*/
-		front_button_value = smp_read_gpio_value(FRONT_BUTTON_GPIO_BANK, FRONT_BUTTON_GPIO_OFFSET);
-		if (front_button_value == 0)
-			break;
+		value = smp_read_gpio_value(FRONT_BUTTON_GPIO_BANK, FRONT_BUTTON_GPIO_OFFSET);
+		if (value != 0 && is_pressed)
+		{
+			timer_debounce = get_timer(0);
+			while (smp_read_gpio_value(FRONT_BUTTON_GPIO_BANK, FRONT_BUTTON_GPIO_OFFSET) != 0 && (get_timer(timer_debounce) < FORCE_BOOT_RESCUE_DEBOUNCE_MS))
+				;
+
+			if (smp_read_gpio_value(FRONT_BUTTON_GPIO_BANK, FRONT_BUTTON_GPIO_OFFSET) != 0)
+			{
+				is_pressed = false;
+			}
+		}
+		else if (value == 0 && !is_pressed)
+		{
+			//button is active low
+			timer_debounce = get_timer(0);
+			while (smp_read_gpio_value(FRONT_BUTTON_GPIO_BANK, FRONT_BUTTON_GPIO_OFFSET) == 0 && (get_timer(timer_debounce) < FORCE_BOOT_RESCUE_DEBOUNCE_MS))
+				;
+
+			if (smp_read_gpio_value(FRONT_BUTTON_GPIO_BANK, FRONT_BUTTON_GPIO_OFFSET) == 0)
+			{
+				is_pressed = true;
+				is_toggled = true;
+
+				to_rescue = !to_rescue;		
+
+				timer_start = get_timer(0);
+				timer_delay = 0;
+				timer_delay_blink = 0;
+				timer_delay_print = 0;
+
+				printf("\nWill boot into %s mode.\n", to_rescue ? "rescue" : "normal");
+			}
+		}
+
+		if (timer_delay >= timer_delay_blink)
+		{
+			timer_delay_blink += to_rescue ? blink_fast : blink_slow;
+			current_led_toggle = !current_led_toggle;
+			smp_set_gpio_value(FRONT_RED_LED_GPIO_BANK, FRONT_RED_LED_GPIO_OFFSET, current_led_toggle);
+			smp_set_gpio_value(FRONT_GREEN_LED_GPIO_BANK, FRONT_GREEN_LED_GPIO_OFFSET, current_led_toggle);
+		}
 
 		if (timer_delay >= timer_delay_print)
 		{
-			timer_delay_print += 1000;
-			if (delay > 0)
-				printf(".");
+			timer_delay_print += 500;
+			printf(".");
 		}
 	}
 	while ((timer_delay = get_timer(timer_start)) < (delay * 1000));
 
-	if (delay > 0)
-		printf("\n");
+	printf("\n");
 
-	return env_set("force_rescue", front_button_value != 0 ? "0" : "1");
+	smp_set_gpio_value(FRONT_RED_LED_GPIO_BANK, FRONT_RED_LED_GPIO_OFFSET, 0);
+	smp_set_gpio_value(FRONT_GREEN_LED_GPIO_BANK, FRONT_GREEN_LED_GPIO_OFFSET, 0);
+
+	if (is_toggled)
+	{
+		env_set("bootcounter", "0");
+		env_set("factoryreset", "0");
+		env_set("force_rescue", to_rescue == 0 ? "0" : "1");
+	}
+
+	return CMD_RET_SUCCESS;
 #else
 	return env_set("force_rescue", "0"); // For CBC-9000 Variscite devkit no rescue option.
 #endif
 }
 
-U_BOOT_CMD(check_force_rescue, 2, 0, do_check_force_rescue,
+U_BOOT_CMD(toggle_force_rescue, 5, 0, do_toggle_force_rescue,
 			"Check if the force-rescue button is pressed before timeout.\n",
-			"timeout\n The timeout in seconds.");
-
+			"isRescue\n wether or not the device was already set to boot in rescue.\n \
+			timeout\n The timeout in seconds.\n \
+			slowBlink\n blink speed in milliseconds for when booting normally.\n \
+			fastBlink\n blink speed in milliseconds for when booting in rescue.\n \
+			");
 
 int do_save_boot_data(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct eaton_boot_data_struct boot_data = {0};
-	if (argc < 2)
+	if (argc < 1)
 	{
 		printf("Insufficient input arguments\n");
 		return CMD_RET_USAGE;
 	}
+
+	const char *bootcounter_str = env_get("bootcounter");
+	if (argc >= 2)
+	{
+		bootcounter_str = argv[1];
+	}
+	int bootcounter = bootcounter_str ? simple_strtoul(bootcounter_str, NULL, 10) : 0;
+
+	const char *factoryreset_str = env_get("factoryreset");
+	if (argc >= 3)
+	{
+		factoryreset_str = argv[2];
+	}
+	int factoryreset = factoryreset_str ? simple_strtoul(factoryreset_str, NULL, 10) : 0;
 
 	int rc = bootdata_read(&boot_data);
 	if (rc < 0)
@@ -685,29 +791,40 @@ int do_save_boot_data(struct cmd_tbl *cmdtp, int flag, int argc, char * const ar
 		memset(&boot_data, 0, sizeof(boot_data));
 	}
 
-	unsigned char boot_count = (u8)simple_strtoul(argv[1], NULL, 10);
-	if (boot_count != boot_data.boot_count)
+	int changed = 0;
+	if (bootcounter != boot_data.boot_count)
 	{
-		boot_data.boot_count = boot_count;
+		changed = 1;
+		boot_data.boot_count = bootcounter;
+		printf("Boot counter changed to: %d\n");
+	}
+
+	if (factoryreset != boot_data.factory_reset)
+	{
+		changed = 1;
+		boot_data.factory_reset = factoryreset;
+		printf("Factory reset flag changed.\n");
+	}
+
+	if (changed)
+	{
 		rc = bootdata_write(&boot_data);
 		if (rc < 0)
 		{
 			printf("Error writing bootdata.bin\n");
 			return CMD_RET_FAILURE;
 		}
-		printf("Boot counter saved: %d\n", boot_count);
-	}
-	else
-	{
-		printf("Boot counter is already at %d\n", boot_count);
+		printf("Boot data saved\n");
 	}
 
 	return CMD_RET_SUCCESS;
 }
 
-U_BOOT_CMD(save_boot_data, 2, 0, do_save_boot_data,
+U_BOOT_CMD(save_boot_data, 3, 0, do_save_boot_data,
 			"Save the bootstruct to emmc memory.",
-			"counter\n The maximum value is 0xff or 255");
+			"counter\n The maximum value is 0xff or 255\n"
+			"factoryreset\n The value is 0 or 1\n"
+			);
 
 int do_boot_data_reset(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {

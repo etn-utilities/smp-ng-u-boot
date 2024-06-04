@@ -751,9 +751,6 @@ static init_fnc_t init_sequence_r[] = {
 	initr_malloc_bootparams,
 #endif
 	INIT_FUNC_WATCHDOG_RESET
-#ifndef CONFIG_SPL_BUILD
-	board_early_check_serial_console,
-#endif	
 	cpu_secondary_init_r,
 #if defined(CONFIG_ID_EEPROM)
 	mac_read_from_eeprom,
