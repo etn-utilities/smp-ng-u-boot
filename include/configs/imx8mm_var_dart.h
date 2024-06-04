@@ -49,7 +49,6 @@
 #define DEFAULT_FDT_FILE "imx8mm-var-dart-da3050.dtb"
 #endif
 
-
 /* ENET Config */
 #if defined(CONFIG_FEC_MXC)
 #define CONFIG_ETHPRIME                 "FEC"
@@ -85,25 +84,27 @@
 	"try_boot_mmc1=yes\0" \
 	"try_boot_mmc2=yes\0" \
 	"bootdelay=3\0" \
-	"forcerescue_delay=1\0" \
+	"forcerescue_delay=3\0" \
 	"erase_mmc2=ask confirm_erase_mmc2 'Enter FORMAT to erase the EMMC:' 6; if env exists confirm_erase_mmc2 && test ${confirm_erase_mmc2} = FORMAT ; then mmc dev 2; mmc erase 0 20480; sleep 5; reset ; fi\0" \
-	"boot_cmd_3=setenv force_rescue 0; setenv bootcounter 0; run emmcboot\0" \
-	"boot_cmd_4=setenv force_rescue 1; run emmcboot\0" \
-	"boot_cmd_5=run erase_mmc2; bootmenu -1\0" \
-	"boot_cmd_8=setenv log_level_kernel 8; setenv log_level_journal 7; setenv ignore_loglevel ignore_loglevel=1; bootmenu -1\0" \
-	"boot_cmd_9=setenv hab_device_closed 1; setenv is_dev_board 0; setenv ignore_dev_board yes; bootmenu -1\0" \
-	"boot_cmd_10=setenv ignore_dev_board yes; setenv is_dev_board 0; bootmenu -1\0" \
+	"boot_cmd_3=setenv force_rescue 0; setenv bootcounter 0; setenv factoryreset 0; run emmcboot\0" \
+	"boot_cmd_4=setenv force_rescue 1; setenv factoryreset 0; run emmcboot\0" \
+	"boot_cmd_5=setenv force_rescue 1; setenv factoryreset 1; run emmcboot\0" \
+	"boot_cmd_6=run erase_mmc2; bootmenu -1\0" \
+	"boot_cmd_9=setenv log_level_kernel 8; setenv log_level_journal 7; setenv ignore_loglevel ignore_loglevel=1; bootmenu -1\0" \
+	"boot_cmd_10=setenv hab_device_closed 1; setenv is_dev_board 0; setenv ignore_dev_board yes; bootmenu -1\0" \
+	"boot_cmd_11=setenv ignore_dev_board yes; setenv is_dev_board 0; bootmenu -1\0" \
 	"bootmenu_0=Boot (default)=boot\0" \
 	"bootmenu_1=Boot from SD Card=run mmcboot\0" \
 	"bootmenu_2=Boot from EMMC=run emmcboot\0" \
 	"bootmenu_3=Boot from EMMC (primary)=run boot_cmd_3\0" \
 	"bootmenu_4=Boot from EMMC (rescue)=run boot_cmd_4\0" \
-	"bootmenu_5=Erase EMMC=run boot_cmd_5\0" \
-	"bootmenu_6=Memory test=mtest\0" \
-	"bootmenu_7=Reboot=reset\0" \
-	"bootmenu_8=Show all logs=run boot_cmd_8\0" \
-	"bootmenu_9=Fake Locked=run boot_cmd_9\0" \
-	"bootmenu_10=Ignore Dev Board=run boot_cmd_10\0" \
+	"bootmenu_5=Factory Reset=run boot_cmd_5\0" \
+	"bootmenu_6=Erase EMMC=run boot_cmd_6\0" \
+	"bootmenu_7=Memory test=mtest\0" \
+	"bootmenu_8=Reboot=reset\0" \
+	"bootmenu_9=Show all logs=run boot_cmd_9\0" \
+	"bootmenu_10=Fake Locked=run boot_cmd_10\0" \
+	"bootmenu_11=Ignore Dev Board=run boot_cmd_11\0" \
 	"bootmenu_default=0\0" \
 	"bootmenu_show=1\0" \
 	"bootmenu_delay=10\0" \
@@ -153,6 +154,7 @@
 	"boot_type=sep\0" \
 	"force_rescue=0\0" \
 	"power_fail=0\0" \
+	"factoryreset=0\0" \
 	"hab_check_file_interface=mmc\0" \
 	"hab_check_file_dev_part=2:5\0" \
 	"hab_check_file_file=/boot/imx-boot.bin\0" \
@@ -266,12 +268,12 @@
 		"run ramsize_check; " \
 		"mmc dev ${emmcdev}; " \
 		"if test ${force_rescue} != 0; then " \
-			"save_boot_data ${bootcounterlimit}; " \
+			"save_boot_data ${bootcounterlimit} ${factoryreset}; " \
 			"echo Booting in rescue mode (button); " \
 			"setenv boot_type ses; " \
 			"setenv force_rescue 1; " \
 		"elif test ${bootcounter} -ge ${bootcounterlimit}; then " \
-			"save_boot_data ${bootcounterlimit}; " \
+			"save_boot_data ${bootcounterlimit} ${factoryreset}; " \
 			"echo Booting in rescue mode (counter=${bootcounter}); " \
 			"setenv boot_type ses; " \
 			"if test ${bootcounter} -eq 128; then " \
@@ -282,11 +284,11 @@
 				"setenv force_rescue 2; " \
 			"fi; " \
 		"elif test -e mmc ${emmcdev}:${part_system} /boot/diag/kernel.bin ; then " \
-			"save_boot_data ${bootcounter}; " \
+			"save_boot_data ${bootcounter} ${factoryreset}; " \
 			"echo Booting in diagnostics mode; " \
 			"setenv boot_type diag; " \
 		"else " \
-			"save_boot_data ${bootcounter}; " \
+			"save_boot_data ${bootcounter} ${factoryreset}; " \
 			"echo Booting in primary mode (counter=${bootcounter}); " \
 			"setenv boot_type sep; " \
 		"fi; " \
@@ -304,7 +306,7 @@
 		"echo Booting in rescue mode (first kernel failed);" \
 		"setenv boot_type ses; " \
 		"setenv force_rescue 3; " \
-		"save_boot_data ${bootcounterlimit}; " \
+		"save_boot_data ${bootcounterlimit} ${factoryreset}; " \
 		"setenv emmcboot2_dev ${emmcdev}; " \
 		"setenv emmcboot2_part ${part_system}; " \
 		"setenv emmcboot2_file /boot/${boot_type}/kernel.bin; " \
@@ -322,7 +324,9 @@
 		"if test ${bootmmcdev} = ${mmcdev}; then " \
 			"if mmc dev ${emmcdev} && test ${try_boot_mmc2} = yes && test -e mmc ${emmcdev}:${part_store} /try-boot-mmc2; then " \
 				"if test ${bootcounter} -lt ${bootcounterlimit}; then " \
-					"check_force_rescue; " \
+					"toggle_force_rescue 0; " \
+				"else " \
+					"toggle_force_rescue 1; " \
 				"fi; " \
 				"run emmcboot; " \
 			"fi; " \
@@ -333,7 +337,9 @@
 				"run mmcboot; " \
 			"fi; " \
 			"if test ${bootcounter} -lt ${bootcounterlimit}; then " \
-				"check_force_rescue; " \
+				"toggle_force_rescue 0; " \
+			"else " \
+				"toggle_force_rescue 1; " \
 			"fi; " \
 			"run emmcboot; " \
 			"echo Failed to start kernel from MMC2; " \
