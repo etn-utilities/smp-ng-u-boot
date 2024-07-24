@@ -9,7 +9,6 @@
 # Default owners for all files
 # This should be changed in each repos
 #
-#*                    @etn-utilities/smp-code-owners-apps    @etn-utilities/smp-code-owners-eg    @etn-utilities/smp-code-owners-platforms
 *                     @etn-utilities/smp-code-owners-platforms
 
 #
