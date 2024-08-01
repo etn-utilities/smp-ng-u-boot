@@ -80,6 +80,8 @@ uint64_t dev_board_uid_list[] = {
 	0x110C21AAC2A3784A, // 11000102   Benach, Brian
 	0x221E29AAC2A3784A, // 11000104   Kumar, Kshitij
 	0x1F3111AAC654D589, // 11000118   Rolle, Sebastien
+	0x2B2F19AAC654D589, // 11000144   Rolle, Sebastien
+	0x2A2B19AAC654D589, // 11000216   Rolle, Sebastien
 
 	0
 };
