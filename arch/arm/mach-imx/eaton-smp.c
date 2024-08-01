@@ -86,6 +86,11 @@ uint64_t dev_board_uid_list[] = {
 	0
 };
 
+const uint64_t* smp_get_dev_board_ids()
+{
+	return dev_board_uid_list;
+}
+
 uint64_t smp_board_serial(void)
 {
 	struct ocotp_regs *ocotp = (struct ocotp_regs *)OCOTP_BASE_ADDR;
