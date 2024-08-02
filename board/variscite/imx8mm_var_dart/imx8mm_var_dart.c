@@ -854,6 +854,6 @@ int do_list_dev_board_ids(struct cmd_tbl *cmdtp, int flag, int argc, char * cons
 	return CMD_RET_SUCCESS;
 }
 
-U_BOOT_CMD(list_dev_board_ids, 0, 0, do_list_dev_board_ids, "list_dev_board_ids", "List Dev board IDs");
+U_BOOT_CMD(list_dev_board_ids, 1, 0, do_list_dev_board_ids, "list_dev_board_ids", "List Dev board IDs");
 
 #endif
