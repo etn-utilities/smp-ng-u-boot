@@ -842,4 +842,18 @@ int do_boot_data_reset(struct cmd_tbl *cmdtp, int flag, int argc, char * const a
 }
 
 U_BOOT_CMD(boot_data_reset, 1, 0, do_boot_data_reset, "boot_data_reset", "Reset the boot data");
+
+int do_list_dev_board_ids(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{	
+	printf("Development boards ID:\n");
+	for (const uint64_t* pID = smp_get_dev_board_ids(); pID != NULL && *pID != NULL; pID++)
+	{
+		printf("\t%" PRIu64 "d\n", *pID);
+	}
+
+	return CMD_RET_SUCCESS;
+}
+
+U_BOOT_CMD(list_dev_board_ids, 1, 0, do_list_dev_board_ids, "list_dev_board_ids", "List Dev board IDs");
+
 #endif

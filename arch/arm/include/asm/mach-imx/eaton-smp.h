@@ -39,5 +39,6 @@ int smp_log_flush(void);
 int smp_file_read(const char *filename, char *buffer, uint32_t buffer_size, uint32_t *len_read);
 uint64_t smp_board_serial(void);
 bool smp_is_dev_board(bool bIgnoreEnv);
+const uint64_t* smp_get_dev_board_ids();
 
 #endif /* _SMP_H */
